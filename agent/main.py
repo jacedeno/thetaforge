@@ -1,79 +1,77 @@
 """Agent entry point.
 
-One pass = scan signals -> build spreads -> risk gates -> execute.
-Run with --dry-run to see decisions without sending orders.
+Modes:
+    --scan       one signal-scan pass (entries)
+    --monitor    one monitor pass (exits)
+    --loop       run continuously during market hours:
+                 scan on each 15m bar close, monitor every minute
+    --dry-run    decide but never send orders (combines with any mode)
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
-import os
+import time
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
+from agent.run_scan import run_scan
+from agent.run_monitor import run_monitor
+
 log = logging.getLogger("thetaforge")
 
+MONITOR_INTERVAL_S = 60
 
-def run_once(dry_run: bool = True) -> None:
-    from alpaca.data.historical import StockHistoricalDataClient
-    from alpaca.data.historical.option import OptionHistoricalDataClient
 
-    from agent.config import Config
+def market_is_open(broker) -> bool:
+    clock = broker.trading.get_clock()
+    return bool(clock.is_open)
+
+
+def run_loop(dry_run: bool) -> None:
     from agent.execution.broker import Broker
-    from agent.options.selector import build_put_credit_spread
-    from agent.risk.gates import check_all, position_qty
-    from agent.signals import ml30
 
-    cfg = Config()
-    key, secret = os.environ["ALPACA_API_KEY"], os.environ["ALPACA_SECRET_KEY"]
-    stock_data = StockHistoricalDataClient(key, secret)
-    option_data = OptionHistoricalDataClient(key, secret)
     broker = Broker()
-
-    signals = ml30.scan(stock_data)
-    log.info("scan complete: %d signal(s)", len(signals))
-    if not signals:
-        return
-
-    equity = broker.equity()
-    obp = broker.options_buying_power()
-    positions = broker.option_positions()
-    held = {p.symbol[:-15] for p in positions}  # strip OCC suffix -> underlying root
-
-    for sig in signals:
-        log.info("signal %s LONG @ %.2f (bar %s)", sig.symbol, sig.close, sig.bar_time)
-        spread = build_put_credit_spread(
-            option_data, sig.symbol, sig.close, cfg.strategy, cfg.risk
-        )
-        if spread is None:
-            log.info("  no spread passes chain/liquidity gates — skip")
-            continue
-        qty = position_qty(spread, equity, cfg.risk)
-        gate = check_all(spread, qty, equity, obp, len(positions), held, cfg.risk)
-        if not gate.passed:
-            log.info("  vetoed: %s", gate.reason)
-            continue
-        log.info(
-            "  %s: sell %s / buy %s x%d, credit ~%.2f, max risk $%.0f",
-            "DRY-RUN" if dry_run else "OPEN",
-            spread.short_symbol, spread.long_symbol, qty,
-            spread.credit_mid, spread.max_risk_per_spread * qty,
-        )
-        if not dry_run:
-            order = broker.open_credit_spread(spread, qty, spread.credit_mid)
-            log.info("  order %s status=%s", order["id"], order["status"])
-            held.add(spread.underlying)
+    last_scan_slot: str | None = None
+    log.info("loop started (dry_run=%s)", dry_run)
+    while True:
+        try:
+            if market_is_open(broker):
+                now = datetime.now(timezone.utc)
+                slot = f"{now.hour}:{now.minute // 15}"   # changes at each 15m boundary
+                # Scan ~30s after the boundary so the just-closed bar is available.
+                if slot != last_scan_slot and now.minute % 15 == 0:
+                    time.sleep(30)
+                    run_scan(dry_run=dry_run)
+                    last_scan_slot = slot
+                run_monitor(dry_run=dry_run)
+            else:
+                log.info("market closed — sleeping 5m")
+                time.sleep(240)
+        except Exception:
+            log.exception("loop iteration failed — continuing")
+        time.sleep(MONITOR_INTERVAL_S)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="ThetaForge agent")
+    parser.add_argument("--scan", action="store_true", help="one entry-scan pass")
+    parser.add_argument("--monitor", action="store_true", help="one exit-monitor pass")
+    parser.add_argument("--loop", action="store_true", help="run continuously")
     parser.add_argument("--dry-run", action="store_true", help="decide but do not send orders")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     load_dotenv()
-    run_once(dry_run=args.dry_run)
+
+    if args.loop:
+        run_loop(dry_run=args.dry_run)
+    elif args.monitor:
+        run_monitor(dry_run=args.dry_run)
+    else:
+        run_scan(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
