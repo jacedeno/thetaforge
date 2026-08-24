@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/* ---- ThetaForge design tokens (dataviz reference palette) ---- */
+:root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;      /* chart surface / cards */
+  --page: #f9f9f7;           /* page plane */
+  --ink-primary: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --series-1: #2a78d6;       /* blue — equity line */
+  --series-2: #eb6834;       /* orange */
+  --good: #0ca30c;
+  --critical: #d03b3b;
+  --delta-up: #006300;       /* success text on light */
+  --delta-down: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --ink-primary: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --delta-up: #0ca30c;
+    --delta-down: #d03b3b;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --ink-primary: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --delta-up: #0ca30c;
+  --delta-down: #d03b3b;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
