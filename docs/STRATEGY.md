@@ -43,7 +43,7 @@ Total buying-power usage ≤ 50%.
 
 ## Open questions (resolve during dev-account testing, Aug 24–27)
 
-- [ ] Multi-leg order mechanics and rejection modes on Alpaca paper
+- [x] Multi-leg order mechanics validated 2026-08-24 — see `alpaca-notes.md` (rejection modes still pending)
 - [ ] Signal timeframe: 15m canonical vs 5m with confirmation
 - [ ] Iron condor leg: enable at launch, or ship directional-only MVP first
 - [ ] IV rank data source for the neutral branch
