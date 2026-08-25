@@ -29,6 +29,11 @@ Two edges, stacked:
 - Spread width: $5 (adjust per underlying price).
 - One position per underlying; max 10 open positions.
 
+> Exits are unconstrained by day-trade limits: FINRA's PDT rule was eliminated
+> 2026-06-04 and replaced by intraday margin, so a spread that hits its profit
+> target the same session it was opened is closed immediately rather than held
+> overnight to preserve a quota. See [`pdt-rule-change-2026.md`](pdt-rule-change-2026.md).
+
 ## Exit rules
 
 - **Profit target:** buy back at 50% of collected credit.
