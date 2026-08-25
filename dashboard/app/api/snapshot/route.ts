@@ -1,6 +1,27 @@
 import { NextResponse } from "next/server";
 import { alpaca, parseOcc } from "@/lib/alpaca";
 
+async function latestOptionQuotes(symbols: string[]): Promise<Record<string, number>> {
+  if (symbols.length === 0) return {};
+  const r = await fetch(
+    `https://data.alpaca.markets/v1beta1/options/quotes/latest?symbols=${symbols.join(",")}`,
+    {
+      headers: {
+        "APCA-API-KEY-ID": process.env.ALPACA_API_KEY!,
+        "APCA-API-SECRET-KEY": process.env.ALPACA_SECRET_KEY!,
+      },
+      cache: "no-store",
+    },
+  );
+  if (!r.ok) return {};
+  const j = (await r.json()) as { quotes: Record<string, { bp: number; ap: number }> };
+  return Object.fromEntries(
+    Object.entries(j.quotes ?? {})
+      .filter(([, q]) => q.bp > 0 && q.ap > 0)
+      .map(([k, q]) => [k, (q.bp + q.ap) / 2]),
+  );
+}
+
 async function latestSpots(symbols: string[]): Promise<Record<string, number>> {
   if (symbols.length === 0) return {};
   const r = await fetch(
@@ -39,7 +60,9 @@ interface Spread {
   qty: number;
   entryCredit: number;
   currentCost: number;
-  unrealizedPl: number;
+  unrealizedPl: number;      // broker mark — can lag the live quote in thin chains
+  midCost: number | null;    // cost to close at the mid — where you'd actually trade
+  midPl: number | null;
   dte: number;
 }
 
@@ -76,6 +99,8 @@ function reconstructSpreads(positions: RawPosition[]): Spread[] {
       entryCredit: +entryCredit.toFixed(2),
       currentCost: +currentCost.toFixed(2),
       unrealizedPl: +(parseFloat(sp.unrealized_pl) + parseFloat(lp.unrealized_pl)).toFixed(2),
+      midCost: null,
+      midPl: null,
       dte,
     });
   }
@@ -99,6 +124,17 @@ export async function GET() {
     const optionPositions = positionsRaw.filter((p) => p.asset_class === "us_option");
     const spreads = reconstructSpreads(optionPositions);
     const spots = await latestSpots([...new Set(spreads.map((s) => s.underlying))]);
+    const optQuotes = await latestOptionQuotes(
+      spreads.flatMap((s) => [s.shortSymbol, s.longSymbol]),
+    );
+    for (const s of spreads) {
+      const sm = optQuotes[s.shortSymbol];
+      const lm = optQuotes[s.longSymbol];
+      if (sm != null && lm != null) {
+        s.midCost = +(sm - lm).toFixed(2);
+        s.midPl = +((s.entryCredit - s.midCost) * 100 * s.qty).toFixed(2);
+      }
+    }
 
     const equitySeries = history.timestamp
       .map((t, i) => [t * 1000, history.equity[i]] as [number, number])

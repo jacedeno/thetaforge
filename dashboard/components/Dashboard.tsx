@@ -18,6 +18,8 @@ interface Spread {
   entryCredit: number;
   currentCost: number;
   unrealizedPl: number;
+  midCost: number | null;
+  midPl: number | null;
   dte: number;
 }
 
@@ -163,9 +165,25 @@ export default function Dashboard() {
                   <div className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
                     exp {s.expiration} · {s.dte}d · credit {usd2(s.entryCredit)}
                   </div>
-                  <div className="mt-2 text-lg font-semibold"
-                    style={{ color: s.unrealizedPl >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}>
-                    {s.unrealizedPl >= 0 ? "+" : ""}{usd2(s.unrealizedPl)}
+                  <div className="mt-2 flex items-baseline gap-4">
+                    <div>
+                      <div className="eyebrow" title="Midpoint of the current bid/ask — a live quote, and where the spread would realistically trade">
+                        at mid
+                      </div>
+                      <div className="text-lg font-semibold"
+                        style={{ color: (s.midPl ?? 0) >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}>
+                        {s.midPl == null ? "—" : `${s.midPl >= 0 ? "+" : ""}${usd2(s.midPl)}`}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="eyebrow" title="The broker's own position mark, which can lag the live quote in thin option chains">
+                        broker mark
+                      </div>
+                      <div className="text-sm font-medium"
+                        style={{ color: "var(--ink-muted)" }}>
+                        {s.unrealizedPl >= 0 ? "+" : ""}{usd2(s.unrealizedPl)}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <PayoffDiagram shortStrike={s.shortStrike} longStrike={s.longStrike}

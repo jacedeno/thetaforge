@@ -1,10 +1,18 @@
 """Options structure selection.
 
 Maps a directional signal to a defined-risk credit spread:
-LONG -> put credit spread (sell ~25-delta put, buy a put one width lower).
+LONG -> put credit spread (sell a ~25-delta put, buy a put one width lower).
 
-Chain data comes from Alpaca's options snapshots (quotes + greeks).
-Every candidate passes liquidity gates before it is returned.
+Two details matter more than they look:
+
+* **Width scales with the underlying.** A fixed $5 width is 18% of a $28 stock
+  and 0.4% of a $1,250 one. The target width is a fraction of spot, clamped,
+  and then snapped to whatever strikes the chain actually lists.
+* **Liquidity is judged in relative *or* absolute terms.** A $0.15 contract
+  quoted 0.10/0.20 is 67% wide but only six cents away from the mid — perfectly
+  tradable. A $10 contract quoted 25% wide is $2.50 of slippage. Requiring both
+  tests to pass rejects nearly every equity chain; requiring either one keeps
+  the judgment closer to how a trader reads a quote.
 """
 
 from __future__ import annotations
@@ -35,6 +43,14 @@ class SpreadCandidate:
         return (self.width - self.credit_mid) * 100
 
 
+def target_width(spot: float, strategy: StrategyConfig) -> float:
+    """Width in dollars, scaled to the underlying and clamped."""
+    return min(
+        max(spot * strategy.spread_width_pct, strategy.spread_width_min_usd),
+        strategy.spread_width_max_usd,
+    )
+
+
 def _mid(quote) -> float | None:
     if quote is None or quote.bid_price is None or quote.ask_price is None:
         return None
@@ -43,11 +59,19 @@ def _mid(quote) -> float | None:
     return (quote.bid_price + quote.ask_price) / 2
 
 
-def _spread_pct(quote) -> float | None:
-    m = _mid(quote)
-    if m is None or m == 0:
-        return None
-    return (quote.ask_price - quote.bid_price) / m
+def is_tradable(quote, risk: RiskConfig) -> bool:
+    """Tight enough relatively, or tight enough absolutely."""
+    mid = _mid(quote)
+    if mid is None:
+        return False
+    spread = quote.ask_price - quote.bid_price
+    return (spread / mid) <= risk.max_bid_ask_width_pct or spread <= risk.max_bid_ask_width_usd
+
+
+def parse_strike(symbol: str, root: str) -> tuple[date, float]:
+    core = symbol[len(root):]
+    exp = date(2000 + int(core[0:2]), int(core[2:4]), int(core[4:6]))
+    return exp, int(core[7:15]) / 1000
 
 
 def build_put_credit_spread(
@@ -58,53 +82,67 @@ def build_put_credit_spread(
     risk: RiskConfig,
     today: date | None = None,
 ) -> SpreadCandidate | None:
-    """Pick short strike nearest target delta within the DTE window, long leg one width below."""
+    """Short strike nearest the target delta; long leg nearest the target width below it."""
     today = today or date.today()
+    width = target_width(spot, strategy)
+
+    # The lower bound must leave room for the long leg beneath the short strike,
+    # or the partner contract falls outside the window we ask for.
     req = OptionChainRequest(
         underlying_symbol=underlying,
         type="put",
         expiration_date_gte=today + timedelta(days=strategy.min_dte),
         expiration_date_lte=today + timedelta(days=strategy.max_dte),
-        strike_price_gte=spot * 0.85,
-        strike_price_lte=spot * 1.0,
+        strike_price_gte=spot * 0.80 - width,
+        strike_price_lte=spot,
     )
     chain = client.get_option_chain(req)
     if not chain:
         return None
 
-    # Index snapshots by (expiration, strike) parsed from the OCC symbol.
-    def parse(symbol: str) -> tuple[date, float]:
-        core = symbol[len(underlying):]
-        exp = date(2000 + int(core[0:2]), int(core[2:4]), int(core[4:6]))
-        strike = int(core[7:15]) / 1000
-        return exp, strike
-
     by_key: dict[tuple[date, float], tuple[str, object]] = {}
     for symbol, snap in chain.items():
-        by_key[parse(symbol)] = (symbol, snap)
+        by_key[parse_strike(symbol, underlying)] = (symbol, snap)
 
-    # Short-leg candidates: delta near target, liquidity gates pass.
     best = None
     for (exp, strike), (symbol, snap) in by_key.items():
         greeks = getattr(snap, "greeks", None)
         quote = getattr(snap, "latest_quote", None)
-        if greeks is None or greeks.delta is None or quote is None:
+        if greeks is None or greeks.delta is None:
             continue
+        # Only sell strikes inside the intended delta band. Taking whatever the
+        # chain offers drifts the short leg toward the money, which is a
+        # different trade than the one this strategy is built on.
         delta = abs(greeks.delta)
-        if _spread_pct(quote) is None or _spread_pct(quote) > risk.max_bid_ask_width_pct:
+        if not (strategy.min_short_delta <= delta <= strategy.max_short_delta):
             continue
-        long_key = (exp, strike - strategy.spread_width_usd)
-        if long_key not in by_key:
+        if not is_tradable(quote, risk):
             continue
-        long_symbol, long_snap = by_key[long_key]
+
+        # Snap the long leg to the listed strike closest to the target width.
+        partners = [
+            (abs((strike - k) - width), k)
+            for (e, k) in by_key
+            if e == exp and k < strike
+        ]
+        if not partners:
+            continue
+        _, long_strike = min(partners)
+        long_symbol, long_snap = by_key[(exp, long_strike)]
         long_quote = getattr(long_snap, "latest_quote", None)
-        if long_quote is None or _spread_pct(long_quote) is None:
+        if not is_tradable(long_quote, risk):
             continue
-        if _spread_pct(long_quote) > risk.max_bid_ask_width_pct:
-            continue
+
         credit = _mid(quote) - _mid(long_quote)
-        if credit <= 0:
+        actual_width = strike - long_strike
+        if credit <= 0 or credit >= actual_width:
             continue
+        # Thin premium is not worth the defined risk behind it.
+        if credit < strategy.min_credit_usd:
+            continue
+        if credit / actual_width < strategy.min_credit_to_width:
+            continue
+
         score = abs(delta - strategy.target_short_delta)
         if best is None or score < best[0]:
             best = (
@@ -114,11 +152,11 @@ def build_put_credit_spread(
                     short_symbol=symbol,
                     long_symbol=long_symbol,
                     short_strike=strike,
-                    long_strike=strike - strategy.spread_width_usd,
+                    long_strike=long_strike,
                     expiration=exp,
                     short_delta=delta,
                     credit_mid=round(credit, 2),
-                    width=strategy.spread_width_usd,
+                    width=round(actual_width, 2),
                 ),
             )
     return best[1] if best else None
