@@ -58,4 +58,8 @@ herdr --session tf-dash        # persistent session for the dashboard
 ./scripts/run_dashboard.sh     # http://localhost:3777
 ```
 
-Logs land in `logs/agent-YYYY-MM-DD.log`.
+Logs land in `logs/agent-YYYY-MM-DD.log`; the agent's decision trail in `logs/events.jsonl`.
+
+**Public showcase:** https://thetaforge.geekendzone.net — served through a
+Cloudflare Tunnel (zero inbound ports). Read-only: API keys live server-side
+only; the page exposes no controls.
