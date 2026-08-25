@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import EquityChart from "./EquityChart";
+import PayoffDiagram from "./PayoffDiagram";
+import BrainFeed from "./BrainFeed";
 
 interface Spread {
   underlying: string;
@@ -15,24 +17,13 @@ interface Spread {
   dte: number;
 }
 
-interface OrderLeg { symbol: string; side: string; intent: string }
-interface Order {
-  id: string;
-  submittedAt: string;
-  status: string;
-  qty: string;
-  limitPrice: string | null;
-  filledAvgPrice: string | null;
-  legs: OrderLeg[];
-}
-
 interface Snapshot {
   asOf: string;
   market: { isOpen: boolean; nextOpen: string };
   account: { number: string; equity: number; lastEquity: number; optionsBuyingPower: number };
   spreads: Spread[];
+  spots: Record<string, number>;
   equitySeries: [number, number][];
-  orders: Order[];
   error?: string;
 }
 
@@ -41,19 +32,24 @@ const usd = (v: number) =>
 const usd2 = (v: number) =>
   v.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
-function StatTile({
-  label, value, delta, deltaLabel,
-}: { label: string; value: string; delta?: number; deltaLabel?: string }) {
+function nextScanCountdown(): string {
+  const now = new Date();
+  const m = now.getMinutes();
+  const next = new Date(now);
+  next.setMinutes(m - (m % 15) + 15, 30, 0); // scans fire ~30s after each 15m boundary
+  const s = Math.max(0, Math.floor((next.getTime() - now.getTime()) / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function StatTile({ label, value, delta }: { label: string; value: string; delta?: number }) {
   return (
     <div className="card px-5 py-4">
       <div className="text-sm" style={{ color: "var(--ink-secondary)" }}>{label}</div>
       <div className="mt-1 text-2xl font-semibold">{value}</div>
       {delta !== undefined && (
-        <div
-          className="mt-1 text-sm font-medium"
-          style={{ color: delta >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}
-        >
-          {delta >= 0 ? "+" : ""}{usd2(delta)}{deltaLabel ? ` ${deltaLabel}` : ""}
+        <div className="mt-1 text-sm font-medium"
+          style={{ color: delta >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}>
+          {delta >= 0 ? "+" : ""}{usd2(delta)} today
         </div>
       )}
     </div>
@@ -63,6 +59,7 @@ function StatTile({
 export default function Dashboard() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState("--:--");
 
   const refresh = useCallback(async () => {
     try {
@@ -79,43 +76,63 @@ export default function Dashboard() {
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 15_000);
-    return () => clearInterval(t);
+    const c = setInterval(() => setCountdown(nextScanCountdown()), 1000);
+    return () => { clearInterval(t); clearInterval(c); };
   }, [refresh]);
 
   if (err) return <main className="p-8 text-sm" style={{ color: "var(--critical)" }}>{err}</main>;
   if (!snap) return <main className="p-8 text-sm" style={{ color: "var(--ink-muted)" }}>Loading…</main>;
 
-  const { account, market, spreads, orders } = snap;
+  const { account, market, spreads, spots } = snap;
   const dayPl = account.equity - account.lastEquity;
   const openRisk = spreads.reduce(
-    (a, s) => a + (s.shortStrike - s.longStrike - s.entryCredit) * 100 * s.qty, 0,
-  );
+    (a, s) => a + (s.shortStrike - s.longStrike - s.entryCredit) * 100 * s.qty, 0);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-6">
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-semibold tracking-tight">ThetaForge</h1>
-          <span className="text-sm" style={{ color: "var(--ink-muted)" }}>
-            paper · {account.number}
-          </span>
+    <main className="mx-auto max-w-6xl px-6 py-8">
+      {/* ---- Hero ---- */}
+      <header className="mb-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-lg" style={{ color: "var(--series-2)" }}>θ·Δ</span>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Theta<span style={{ color: "var(--series-2)" }}>Forge</span>
+            </h1>
+            <span className="text-sm" style={{ color: "var(--ink-muted)" }}>
+              autonomous options agent · Alpaca paper
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-sm" style={{ color: "var(--ink-secondary)" }}>
+            <span className="flex items-center gap-2">
+              <span className="inline-block h-2 w-2 rounded-full"
+                style={{ background: market.isOpen ? "var(--good)" : "var(--ink-muted)" }} />
+              {market.isOpen ? "Market open" : "Market closed"}
+            </span>
+            {market.isOpen && (
+              <span className="font-mono" style={{ color: "var(--ink-muted)" }}>
+                next scan {countdown}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm" style={{ color: "var(--ink-secondary)" }}>
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ background: market.isOpen ? "var(--good)" : "var(--ink-muted)" }}
-          />
-          {market.isOpen ? "Market open" : "Market closed"}
-        </div>
+        <p className="mt-3 max-w-3xl text-[15px] leading-relaxed" style={{ color: "var(--ink-secondary)" }}>
+          A machine-learning momentum model — validated over 3,600 equity backtests — picks the
+          direction. The agent expresses it through <b style={{ color: "var(--ink-primary)" }}>defined-risk
+          options credit spreads</b>, harvesting the volatility risk premium with a hard max loss on
+          every position. Fully autonomous: it scans, decides, executes and manages — you are watching
+          it live.
+        </p>
       </header>
 
+      {/* ---- KPI row ---- */}
       <section className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile label="Equity" value={usd(account.equity)} delta={dayPl} deltaLabel="today" />
+        <StatTile label="Equity" value={usd(account.equity)} delta={dayPl} />
         <StatTile label="Open spreads" value={String(spreads.length)} />
         <StatTile label="Capital at risk" value={usd(openRisk)} />
         <StatTile label="Options buying power" value={usd(account.optionsBuyingPower)} />
       </section>
 
+      {/* ---- Equity curve ---- */}
       <section className="card mb-6 p-5">
         <h2 className="mb-3 text-sm font-medium" style={{ color: "var(--ink-secondary)" }}>
           Equity — last week
@@ -123,93 +140,97 @@ export default function Dashboard() {
         <EquityChart data={snap.equitySeries} />
       </section>
 
-      <section className="card mb-6 overflow-x-auto p-5">
+      {/* ---- Open positions with payoff ---- */}
+      <section className="card mb-6 p-5">
         <h2 className="mb-3 text-sm font-medium" style={{ color: "var(--ink-secondary)" }}>
           Open positions
         </h2>
         {spreads.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No open spreads.</p>
+          <p className="text-sm" style={{ color: "var(--ink-muted)" }}>
+            No open spreads — the agent is waiting for its next signal.
+          </p>
         ) : (
-          <table className="w-full text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
-            <thead>
-              <tr className="text-left" style={{ color: "var(--ink-muted)" }}>
-                <th className="pb-2 font-normal">Underlying</th>
-                <th className="pb-2 font-normal">Structure</th>
-                <th className="pb-2 font-normal">Exp / DTE</th>
-                <th className="pb-2 text-right font-normal">Qty</th>
-                <th className="pb-2 text-right font-normal">Credit</th>
-                <th className="pb-2 text-right font-normal">Cost now</th>
-                <th className="pb-2 text-right font-normal">P&L</th>
-              </tr>
-            </thead>
-            <tbody>
-              {spreads.map((s) => (
-                <tr key={s.underlying + s.expiration} className="border-t" style={{ borderColor: "var(--grid)" }}>
-                  <td className="py-2 font-medium">{s.underlying}</td>
-                  <td className="py-2">{s.shortStrike}/{s.longStrike} put credit</td>
-                  <td className="py-2">{s.expiration} · {s.dte}d</td>
-                  <td className="py-2 text-right">{s.qty}</td>
-                  <td className="py-2 text-right">{usd2(s.entryCredit)}</td>
-                  <td className="py-2 text-right">{usd2(s.currentCost)}</td>
-                  <td
-                    className="py-2 text-right font-medium"
-                    style={{ color: s.unrealizedPl >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}
-                  >
+          <div className="grid gap-4 md:grid-cols-2">
+            {spreads.map((s) => (
+              <div key={s.underlying + s.expiration}
+                className="flex items-center justify-between rounded-lg border p-4"
+                style={{ borderColor: "var(--grid)" }}>
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-semibold">{s.underlying}</span>
+                    <span className="text-sm" style={{ color: "var(--ink-secondary)" }}>
+                      {s.shortStrike}/{s.longStrike} put credit ×{s.qty}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
+                    exp {s.expiration} · {s.dte}d · credit {usd2(s.entryCredit)}
+                  </div>
+                  <div className="mt-2 text-lg font-semibold"
+                    style={{ color: s.unrealizedPl >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}>
                     {s.unrealizedPl >= 0 ? "+" : ""}{usd2(s.unrealizedPl)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+                <PayoffDiagram shortStrike={s.shortStrike} longStrike={s.longStrike}
+                  credit={s.entryCredit} spot={spots[s.underlying]} />
+              </div>
+            ))}
+          </div>
         )}
       </section>
 
-      <section className="card overflow-x-auto p-5">
-        <h2 className="mb-3 text-sm font-medium" style={{ color: "var(--ink-secondary)" }}>
-          Order log
+      {/* ---- Agent brain ---- */}
+      <section className="card mb-6 p-5">
+        <h2 className="mb-1 text-sm font-medium" style={{ color: "var(--ink-secondary)" }}>
+          Agent brain — live decision feed
         </h2>
-        {orders.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--ink-muted)" }}>No option orders yet.</p>
-        ) : (
-          <table className="w-full text-sm" style={{ fontVariantNumeric: "tabular-nums" }}>
-            <thead>
-              <tr className="text-left" style={{ color: "var(--ink-muted)" }}>
-                <th className="pb-2 font-normal">Submitted</th>
-                <th className="pb-2 font-normal">Legs</th>
-                <th className="pb-2 text-right font-normal">Qty</th>
-                <th className="pb-2 text-right font-normal">Limit</th>
-                <th className="pb-2 text-right font-normal">Fill</th>
-                <th className="pb-2 text-right font-normal">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o) => (
-                <tr key={o.id} className="border-t align-top" style={{ borderColor: "var(--grid)" }}>
-                  <td className="py-2 whitespace-nowrap">
-                    {new Date(o.submittedAt).toLocaleString("en-US", {
-                      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-                    })}
-                  </td>
-                  <td className="py-2">
-                    {o.legs.map((l) => (
-                      <div key={l.symbol}>
-                        <span style={{ color: "var(--ink-muted)" }}>{l.side}</span> {l.symbol}
-                      </div>
-                    ))}
-                  </td>
-                  <td className="py-2 text-right">{o.qty}</td>
-                  <td className="py-2 text-right">{o.limitPrice ?? "—"}</td>
-                  <td className="py-2 text-right">{o.filledAvgPrice ?? "—"}</td>
-                  <td className="py-2 text-right">{o.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <p className="mb-3 text-xs" style={{ color: "var(--ink-muted)" }}>
+          Every scan, signal, veto and order, exactly as the agent reasons through it.
+        </p>
+        <BrainFeed />
       </section>
 
-      <footer className="mt-4 text-xs" style={{ color: "var(--ink-muted)" }}>
-        Refreshes every 15s · as of {new Date(snap.asOf).toLocaleTimeString()}
+      {/* ---- Strategy ---- */}
+      <section className="card mb-6 p-5">
+        <h2 className="mb-4 text-sm font-medium" style={{ color: "var(--ink-secondary)" }}>
+          How it works
+        </h2>
+        <div className="grid gap-6 text-sm leading-relaxed md:grid-cols-3"
+          style={{ color: "var(--ink-secondary)" }}>
+          <div>
+            <div className="mb-1 font-mono text-xs" style={{ color: "var(--series-1)" }}>01 · SIGNAL</div>
+            <b style={{ color: "var(--ink-primary)" }}>ML momentum trigger.</b> A four-condition
+            SMA55/21 crossover system scans the 80 most liquid S&P 500 names on 15-minute bars.
+            Signals are ranked by breakout strength; only the strongest trade.
+          </div>
+          <div>
+            <div className="mb-1 font-mono text-xs" style={{ color: "var(--series-2)" }}>02 · STRUCTURE</div>
+            <b style={{ color: "var(--ink-primary)" }}>Defined-risk spreads.</b> Bullish signal →
+            sell a ~25Δ put credit spread, 7–21 DTE. Max loss is capped by construction; time decay
+            works for the position every day.
+          </div>
+          <div>
+            <div className="mb-1 font-mono text-xs" style={{ color: "var(--good)" }}>03 · MANAGE</div>
+            <b style={{ color: "var(--ink-primary)" }}>Risk gates &amp; exits.</b> ≤2% equity risk per
+            position, liquidity screens on every chain. Close at 50% profit, stop at 2× credit,
+            never carry past 2 DTE.
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Footer ---- */}
+      <footer className="flex flex-wrap items-center justify-between gap-3 text-xs"
+        style={{ color: "var(--ink-muted)" }}>
+        <div className="flex gap-2">
+          {["Alpaca Trading API", "MCP Server", "Alpaca CLI", "Paper Trading"].map((t) => (
+            <span key={t} className="rounded-full border px-3 py-1" style={{ borderColor: "var(--grid)" }}>
+              {t}
+            </span>
+          ))}
+        </div>
+        <div>
+          Built for the Alpaca AI Trading Agents Hackathon · account {account.number} ·
+          refreshes every 15s · not financial advice
+        </div>
       </footer>
     </main>
   );

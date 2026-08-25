@@ -1,6 +1,23 @@
 import { NextResponse } from "next/server";
 import { alpaca, parseOcc } from "@/lib/alpaca";
 
+async function latestSpots(symbols: string[]): Promise<Record<string, number>> {
+  if (symbols.length === 0) return {};
+  const r = await fetch(
+    `https://data.alpaca.markets/v2/stocks/trades/latest?feed=iex&symbols=${symbols.join(",")}`,
+    {
+      headers: {
+        "APCA-API-KEY-ID": process.env.ALPACA_API_KEY!,
+        "APCA-API-SECRET-KEY": process.env.ALPACA_SECRET_KEY!,
+      },
+      cache: "no-store",
+    },
+  );
+  if (!r.ok) return {};
+  const j = (await r.json()) as { trades: Record<string, { p: number }> };
+  return Object.fromEntries(Object.entries(j.trades ?? {}).map(([k, v]) => [k, v.p]));
+}
+
 export const dynamic = "force-dynamic";
 
 interface RawPosition {
@@ -81,6 +98,7 @@ export async function GET() {
 
     const optionPositions = positionsRaw.filter((p) => p.asset_class === "us_option");
     const spreads = reconstructSpreads(optionPositions);
+    const spots = await latestSpots([...new Set(spreads.map((s) => s.underlying))]);
 
     const equitySeries = history.timestamp
       .map((t, i) => [t * 1000, history.equity[i]] as [number, number])
@@ -97,6 +115,7 @@ export async function GET() {
         cash: parseFloat(account.cash),
       },
       spreads,
+      spots,
       equitySeries,
       orders: ordersRaw.slice(0, 30).map((o) => ({
         id: o.id,

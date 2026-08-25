@@ -57,6 +57,10 @@ def run_monitor(dry_run: bool = True) -> None:
             continue
         decision = evaluate_exit(sp, short_mid, long_mid, cfg.strategy)
         log.info("%s x%d: %s — %s", sp.underlying, sp.qty, decision.action, decision.reason)
+        from agent import events
+        if decision.action == "CLOSE":
+            events.emit("exit_signal", symbol=sp.underlying, reason=decision.reason,
+                        cost=decision.cost_to_close, credit=sp.entry_credit, qty=sp.qty)
         if decision.action == "CLOSE" and not dry_run:
             # Cross the spread a little to get filled on exits.
             limit = round(decision.cost_to_close * 1.02 + 0.01, 2)
@@ -64,3 +68,5 @@ def run_monitor(dry_run: bool = True) -> None:
                 sp.short_symbol, sp.long_symbol, sp.qty, limit
             )
             log.info("  close order %s status=%s limit=%.2f", order["id"], order["status"], limit)
+            events.emit("order_close", symbol=sp.underlying, qty=sp.qty,
+                        limit=limit, reason=decision.reason, status=order["status"])

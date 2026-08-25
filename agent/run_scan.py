@@ -26,6 +26,8 @@ def run_scan(dry_run: bool = True) -> None:
 
     signals = ml30.scan(stock_data)
     log.info("scan complete: %d signal(s)", len(signals))
+    from agent import events
+    events.emit("scan", signals=len(signals), universe=80)
     if not signals:
         return
 
@@ -42,16 +44,20 @@ def run_scan(dry_run: bool = True) -> None:
             log.info("per-scan entry cap reached — %d signal(s) deferred", len(signals) - signals.index(sig))
             break
         log.info("signal %s LONG @ %.2f strength=%.4f (bar %s)", sig.symbol, sig.close, sig.strength, sig.bar_time)
+        events.emit("signal", symbol=sig.symbol, direction="LONG", price=sig.close,
+                    strength=round(sig.strength, 4))
         spread = build_put_credit_spread(
             option_data, sig.symbol, sig.close, cfg.strategy, cfg.risk
         )
         if spread is None:
             log.info("  no spread passes chain/liquidity gates — skip")
+            events.emit("veto", symbol=sig.symbol, reason="no spread passes chain/liquidity gates")
             continue
         qty = position_qty(spread, equity, cfg.risk)
         gate = check_all(spread, qty, equity, obp, len(held), held, cfg.risk)
         if not gate.passed:
             log.info("  vetoed: %s", gate.reason)
+            events.emit("veto", symbol=sig.symbol, reason=gate.reason)
             continue
         log.info(
             "  %s: sell %s / buy %s x%d, credit ~%.2f, max risk $%.0f",
@@ -63,4 +69,9 @@ def run_scan(dry_run: bool = True) -> None:
         if not dry_run:
             order = broker.open_credit_spread(spread, qty, spread.credit_mid)
             log.info("  order %s status=%s", order["id"], order["status"])
+            events.emit("order_open", symbol=spread.underlying,
+                        short=spread.short_symbol, long=spread.long_symbol,
+                        qty=qty, credit=spread.credit_mid,
+                        max_risk=round(spread.max_risk_per_spread * qty, 2),
+                        delta=spread.short_delta, status=order["status"])
             held.add(spread.underlying)
