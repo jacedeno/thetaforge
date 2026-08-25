@@ -41,6 +41,20 @@ Two edges, stacked:
 - **Time stop:** close or roll at 2 DTE — never carry into expiration/assignment.
 - **Signal flip:** an opposing ML30 signal on the underlying closes the position.
 
+## Order handling
+
+Entries are limit orders priced at the spread's mid. A limit that sits unfilled
+goes stale: once the underlying moves, the credit it asks for no longer exists
+in the market. Unfilled **entry** orders are therefore cancelled after 3 minutes
+(`order_stale_after_s`) rather than left to tie up buying power or fill hours
+later under conditions the original signal no longer describes. Exit orders are
+never cancelled by this rule — an open position must always be able to close.
+
+Observed live 2026-08-25: an order submitted the previous evening at a $0.75
+credit was still unfilled at the open after SPY rose 0.4% overnight and the
+spread's credit compressed to $0.56. Re-priced to $0.55, it filled in 200ms at
+$0.63 (price improvement).
+
 ## Position sizing
 
 Max risk per position (width − credit) ≤ 2% of account equity.

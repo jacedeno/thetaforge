@@ -18,6 +18,7 @@ def run_monitor(dry_run: bool = True) -> None:
 
     cfg = Config()
     broker = Broker()
+    from agent import events
     option_data = OptionHistoricalDataClient(
         os.environ["ALPACA_API_KEY"], os.environ["ALPACA_SECRET_KEY"]
     )
@@ -42,9 +43,24 @@ def run_monitor(dry_run: bool = True) -> None:
     if not spreads:
         return
 
+    # Cancel entry orders that went stale before filling — the credit they ask
+    # for no longer exists once the underlying has moved.
+    open_orders = broker.open_option_orders()
+    from agent.execution.stale import select_stale
+
+    for o in select_stale(open_orders, cfg.strategy.order_stale_after_s):
+        try:
+            broker.cancel_order(str(o.id))
+            log.info("cancelled stale entry order %s", o.id)
+            events.emit("order_stale", order_id=str(o.id),
+                        age_s=int(cfg.strategy.order_stale_after_s))
+        except Exception:
+            log.exception("could not cancel stale order %s", o.id)
+    open_orders = [o for o in open_orders if o not in select_stale(open_orders, cfg.strategy.order_stale_after_s)]
+
     # Symbols with an open (pending) order are skipped to avoid duplicates.
     pending = set()
-    for o in broker.open_option_orders():
+    for o in open_orders:
         for leg in getattr(o, "legs", None) or []:
             pending.add(leg.symbol)
         if getattr(o, "symbol", None):
@@ -71,7 +87,6 @@ def run_monitor(dry_run: bool = True) -> None:
             continue
         decision = evaluate_exit(sp, short_mid, long_mid, cfg.strategy)
         log.info("%s x%d: %s — %s", sp.underlying, sp.qty, decision.action, decision.reason)
-        from agent import events
         if decision.action == "CLOSE":
             events.emit("exit_signal", symbol=sp.underlying, reason=decision.reason,
                         cost=decision.cost_to_close, credit=sp.entry_credit, qty=sp.qty)

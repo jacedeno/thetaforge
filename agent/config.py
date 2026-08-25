@@ -12,6 +12,7 @@ class StrategyConfig:
     min_dte: int = 7                       # minimum days to expiration at entry
     max_dte: int = 21                      # maximum days to expiration at entry
     max_new_positions_per_scan: int = 3    # strongest signals first
+    order_stale_after_s: int = 180         # cancel unfilled entries after 3 minutes
     profit_target_pct: float = 0.50        # close at 50% of collected credit
     stop_loss_credit_mult: float = 2.0     # stop when loss reaches 2x credit
 

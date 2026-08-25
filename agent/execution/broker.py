@@ -112,3 +112,6 @@ class Broker:
         from alpaca.trading.enums import QueryOrderStatus
 
         return self.trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN))
+
+    def cancel_order(self, order_id: str) -> None:
+        self.trading.cancel_order_by_id(order_id)
