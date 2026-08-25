@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as echarts from "echarts/core";
 import { LineChart } from "echarts/charts";
 import { GridComponent, TooltipComponent } from "echarts/components";
@@ -15,6 +15,20 @@ function token(name: string): string {
 export default function EquityChart({ data }: { data: [number, number][] }) {
   const ref = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
+  const [themeTick, setThemeTick] = useState(0);
+
+  // Re-read CSS tokens when the theme changes (OS setting or data-theme toggle).
+  useEffect(() => {
+    const bump = () => setThemeTick((t) => t + 1);
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", bump);
+    const mo = new MutationObserver(bump);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => {
+      mq.removeEventListener("change", bump);
+      mo.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -73,7 +87,7 @@ export default function EquityChart({ data }: { data: [number, number][] }) {
         },
       ],
     });
-  }, [data]);
+  }, [data, themeTick]);
 
   return <div ref={ref} className="h-64 w-full" />;
 }

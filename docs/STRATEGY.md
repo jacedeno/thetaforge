@@ -47,3 +47,15 @@ Total buying-power usage ≤ 50%.
 - [ ] Signal timeframe: 15m canonical vs 5m with confirmation
 - [ ] Iron condor leg: enable at launch, or ship directional-only MVP first
 - [ ] IV rank data source for the neutral branch
+
+## Runbook (competition week)
+
+```
+herdr --session thetaforge     # persistent session for the agent
+./scripts/run_loop.sh          # scan each 15m bar close + monitor exits every minute
+
+herdr --session tf-dash        # persistent session for the dashboard
+./scripts/run_dashboard.sh     # http://localhost:3777
+```
+
+Logs land in `logs/agent-YYYY-MM-DD.log`.

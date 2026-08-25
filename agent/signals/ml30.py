@@ -42,6 +42,15 @@ class Signal:
     sma_fast: float
     bar_time: datetime
 
+    @property
+    def strength(self) -> float:
+        """Momentum quality: breakout distance over both SMAs, in fractional terms.
+
+        Used to rank simultaneous signals — a decisive cross scores higher than
+        a marginal one.
+        """
+        return (self.close / self.sma_slow - 1) + (self.close / self.sma_fast - 1)
+
 
 def load_universe() -> list[str]:
     return json.loads(_UNIVERSE_PATH.read_text())["symbols"]
@@ -93,8 +102,8 @@ def evaluate(symbol: str, df: pd.DataFrame) -> Signal | None:
 
 
 def scan(client: StockHistoricalDataClient, symbols: list[str] | None = None) -> list[Signal]:
-    """Scan the universe and return all symbols triggering on the latest bar."""
+    """Scan the universe; return triggering symbols ranked strongest-first."""
     symbols = symbols or load_universe()
     bars = fetch_bars(client, symbols)
     signals = [s for sym, df in bars.items() if (s := evaluate(sym, df))]
-    return signals
+    return sorted(signals, key=lambda s: s.strength, reverse=True)

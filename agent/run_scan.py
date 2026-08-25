@@ -36,8 +36,12 @@ def run_scan(dry_run: bool = True) -> None:
 
     held = {parse_occ(p.symbol).root for p in positions}
 
+    opened_this_scan = 0
     for sig in signals:
-        log.info("signal %s LONG @ %.2f (bar %s)", sig.symbol, sig.close, sig.bar_time)
+        if opened_this_scan >= cfg.strategy.max_new_positions_per_scan:
+            log.info("per-scan entry cap reached — %d signal(s) deferred", len(signals) - signals.index(sig))
+            break
+        log.info("signal %s LONG @ %.2f strength=%.4f (bar %s)", sig.symbol, sig.close, sig.strength, sig.bar_time)
         spread = build_put_credit_spread(
             option_data, sig.symbol, sig.close, cfg.strategy, cfg.risk
         )
@@ -55,6 +59,7 @@ def run_scan(dry_run: bool = True) -> None:
             spread.short_symbol, spread.long_symbol, qty,
             spread.credit_mid, spread.max_risk_per_spread * qty,
         )
+        opened_this_scan += 1
         if not dry_run:
             order = broker.open_credit_spread(spread, qty, spread.credit_mid)
             log.info("  order %s status=%s", order["id"], order["status"])

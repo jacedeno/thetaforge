@@ -1,0 +1,149 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - link "Live page — event live page" [ref=e4] [cursor=pointer]:
+      - /url: /ai-hackathons/alpaca-ai-trading-agents-hackathon/live
+      - img [ref=e6]
+      - generic [ref=e12]: Live page
+    - generic [ref=e16]:
+      - generic [ref=e18]:
+        - generic [ref=e20]:
+          - img [ref=e21]
+          - paragraph [ref=e23]: "2125"
+        - generic [ref=e24]:
+          - img [ref=e25]
+          - text: Online
+        - heading "Alpaca AI Trading Agents Hackathon" [level=1] [ref=e27]
+        - heading "Code the next generation of algorithmic trading" [level=2] [ref=e28]
+        - generic [ref=e29]:
+          - paragraph [ref=e30]: "🌎 Online Hackathon | 💻 Dates: 28 August–4 September 2026 | 🏆 $6,000 Prize Pool"
+          - paragraph [ref=e31]
+          - paragraph [ref=e32]: Build AI trading agents on Alpaca — autonomous agents and trading apps using Alpaca's Trading API, MCP server and CLI.
+          - paragraph [ref=e33]
+          - paragraph [ref=e34]: 🌍 Fully online hackathon. Join and build from anywhere in the world.
+        - generic [ref=e35]:
+          - link "Sign up" [ref=e36] [cursor=pointer]:
+            - /url: /ai-hackathons/alpaca-ai-trading-agents-hackathon?enroll=true
+          - generic [ref=e37]:
+            - link "Alpaca AI Trading Agents Hackathon" [ref=e38] [cursor=pointer]:
+              - /url: https://www.twitch.tv/lablabai
+              - img [ref=e39]
+            - link "Alpaca AI Trading Agents Hackathon" [ref=e44] [cursor=pointer]:
+              - /url: https://discord.gg/lablabai
+              - img [ref=e45]
+      - img "Alpaca AI Trading Agents Hackathon event thumbnail" [ref=e49]
+  - contentinfo "Footer navigation" [ref=e63]:
+    - heading "Footer navigation" [level=3] [ref=e64]
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - generic [ref=e67]:
+          - img "Community innovating and building with artificial intelligence" [ref=e68]
+          - paragraph [ref=e69]: Unlocking state-of-the-art artificial intelligence and building with the world's talent
+          - list [ref=e71]:
+            - listitem [ref=e72]:
+              - link "LinkedIn" [ref=e73] [cursor=pointer]:
+                - /url: https://www.linkedin.com/company/lablab-ai/
+                - generic [ref=e74]: LinkedIn
+                - img [ref=e75]
+            - listitem [ref=e77]:
+              - link "Twitter/X" [ref=e78] [cursor=pointer]:
+                - /url: https://x.com/lablabai
+                - generic [ref=e79]: Twitter/X
+                - img [ref=e80]
+            - listitem [ref=e82]:
+              - link "Instagram" [ref=e83] [cursor=pointer]:
+                - /url: https://www.instagram.com/lablab.ai/
+                - generic [ref=e84]: Instagram
+                - img [ref=e85]
+            - listitem [ref=e87]:
+              - link "Discord" [ref=e88] [cursor=pointer]:
+                - /url: https://discord.gg/lablabai
+                - generic [ref=e89]: Discord
+                - img [ref=e90]
+            - listitem [ref=e92]:
+              - link "YouTube" [ref=e93] [cursor=pointer]:
+                - /url: https://www.youtube.com/@lablabai
+                - generic [ref=e94]: YouTube
+                - img [ref=e95]
+            - listitem [ref=e97]:
+              - link "Twitch" [ref=e98] [cursor=pointer]:
+                - /url: https://www.twitch.tv/lablabai
+                - generic [ref=e99]: Twitch
+                - img [ref=e100]
+          - generic [ref=e102]:
+            - paragraph [ref=e103]: "Other group brands:"
+            - link "https://nativelyai.com" [ref=e105] [cursor=pointer]:
+              - /url: https://nativelyai.com
+              - img "https://nativelyai.com" [ref=e106]
+        - generic [ref=e107]:
+          - generic [ref=e108]:
+            - text: Links
+            - list [ref=e109]:
+              - listitem [ref=e110]:
+                - link "AI Tech" [ref=e111] [cursor=pointer]:
+                  - /url: /tech
+              - listitem [ref=e112]:
+                - link "AI Hackathons" [ref=e113] [cursor=pointer]:
+                  - /url: /ai-hackathons
+              - listitem [ref=e114]:
+                - link "AI Tutorials" [ref=e115] [cursor=pointer]:
+                  - /url: /ai-tutorials
+              - listitem [ref=e116]:
+                - link "AI Applications" [ref=e117] [cursor=pointer]:
+                  - /url: /apps
+              - listitem [ref=e118]:
+                - link "NativelyAI" [ref=e119] [cursor=pointer]:
+                  - /url: https://nativelyai.com/#products
+              - listitem [ref=e120]:
+                - link "AI Articles" [ref=e121] [cursor=pointer]:
+                  - /url: /ai-articles
+              - listitem [ref=e122]:
+                - link "Leaderboard" [ref=e123] [cursor=pointer]:
+                  - /url: /leaderboard
+              - listitem [ref=e124]:
+                - link "Writers" [ref=e125] [cursor=pointer]:
+                  - /url: /writers
+          - generic [ref=e126]:
+            - text: lablab
+            - list [ref=e127]:
+              - listitem [ref=e128]:
+                - link "About" [ref=e129] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e130]:
+                - link "Brand" [ref=e131] [cursor=pointer]:
+                  - /url: /brand
+              - listitem [ref=e132]:
+                - link "Hackathon Guidelines" [ref=e133] [cursor=pointer]:
+                  - /url: /guide
+              - listitem [ref=e134]:
+                - link "Terms of Use" [ref=e135] [cursor=pointer]:
+                  - /url: /terms-of-use
+              - listitem [ref=e136]:
+                - link "Code of Conduct" [ref=e137] [cursor=pointer]:
+                  - /url: /code-of-conduct
+              - listitem [ref=e138]:
+                - link "Privacy Policy" [ref=e139] [cursor=pointer]:
+                  - /url: /privacy-policy
+          - generic [ref=e140]:
+            - text: Get in touch
+            - list [ref=e141]:
+              - listitem [ref=e142]:
+                - link "Discord" [ref=e143] [cursor=pointer]:
+                  - /url: https://discord.gg/lablabai
+              - listitem [ref=e144]:
+                - link "Sponsor" [ref=e145] [cursor=pointer]:
+                  - /url: /sponsor
+              - listitem [ref=e146]:
+                - link "Cooperation" [ref=e147] [cursor=pointer]:
+                  - /url: /cooperation
+              - listitem [ref=e148]:
+                - link "Contribute" [ref=e149] [cursor=pointer]:
+                  - /url: https://wkf.ms/3PQMLlq
+              - listitem [ref=e150]:
+                - link "community@lablab.ai" [ref=e151] [cursor=pointer]:
+                  - /url: mailto:community@lablab.ai
+      - generic [ref=e152]:
+        - paragraph [ref=e153]: © 2026 NativelyAI Inc. All rights reserved.
+        - paragraph [ref=e154]: 3.53.0
+  - button "Help" [ref=e156] [cursor=pointer]:
+    - img [ref=e158]
+    - generic [ref=e162]: Help
