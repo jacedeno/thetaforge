@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.6",
     "lightweight-charts": "^5.2.1",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

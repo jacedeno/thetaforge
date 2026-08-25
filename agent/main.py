@@ -17,8 +17,20 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
+import json
+from pathlib import Path
+
 from agent.run_scan import run_scan
 from agent.run_monitor import run_monitor
+
+HEARTBEAT = Path(__file__).resolve().parent.parent / "data" / "heartbeat.json"
+
+
+def beat(**extra) -> None:
+    HEARTBEAT.parent.mkdir(exist_ok=True)
+    HEARTBEAT.write_text(json.dumps({
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), **extra,
+    }))
 
 log = logging.getLogger("thetaforge")
 
@@ -35,10 +47,17 @@ def run_loop(dry_run: bool) -> None:
 
     broker = Broker()
     last_scan_slot: str | None = None
+    last_scan_ts: str | None = None
+    started = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    iteration = 0
     log.info("loop started (dry_run=%s)", dry_run)
     while True:
         try:
-            if market_is_open(broker):
+            iteration += 1
+            open_now = market_is_open(broker)
+            beat(market_open=open_now, last_scan=last_scan_ts, started=started,
+                 iteration=iteration, dry_run=dry_run)
+            if open_now:
                 now = datetime.now(timezone.utc)
                 slot = f"{now.hour}:{now.minute // 15}"   # changes at each 15m boundary
                 # Scan ~30s after the boundary so the just-closed bar is available.
@@ -46,6 +65,7 @@ def run_loop(dry_run: bool) -> None:
                     time.sleep(30)
                     run_scan(dry_run=dry_run)
                     last_scan_slot = slot
+                    last_scan_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
                 run_monitor(dry_run=dry_run)
             else:
                 log.info("market closed — sleeping 5m")

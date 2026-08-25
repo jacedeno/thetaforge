@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import EquityChart from "./EquityChart";
 import PayoffDiagram from "./PayoffDiagram";
 import BrainFeed from "./BrainFeed";
+import StatusStrip from "./StatusStrip";
+import ThemeToggle from "./ThemeToggle";
+import TradeHistory from "./TradeHistory";
+import DailyPnl from "./DailyPnl";
 
 interface Spread {
   underlying: string;
@@ -89,31 +93,22 @@ export default function Dashboard() {
     (a, s) => a + (s.shortStrike - s.longStrike - s.entryCredit) * 100 * s.qty, 0);
 
   return (
+    <>
+    <StatusStrip marketOpen={market.isOpen} countdown={countdown} />
     <main className="mx-auto max-w-6xl px-6 py-8">
       {/* ---- Hero ---- */}
       <header className="mb-8">
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-3">
-            <span className="font-mono text-lg" style={{ color: "var(--series-2)" }}>θ·Δ</span>
-            <h1 className="text-2xl font-bold tracking-tight">
+            <span className="font-mono2 text-lg" style={{ color: "var(--accent)" }}>θ·Δ</span>
+            <h1 className="font-display text-2xl font-bold tracking-tight">
               Theta<span style={{ color: "var(--series-2)" }}>Forge</span>
             </h1>
             <span className="text-sm" style={{ color: "var(--ink-muted)" }}>
               autonomous options agent · Alpaca paper
             </span>
           </div>
-          <div className="flex items-center gap-4 text-sm" style={{ color: "var(--ink-secondary)" }}>
-            <span className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full"
-                style={{ background: market.isOpen ? "var(--good)" : "var(--ink-muted)" }} />
-              {market.isOpen ? "Market open" : "Market closed"}
-            </span>
-            {market.isOpen && (
-              <span className="font-mono" style={{ color: "var(--ink-muted)" }}>
-                next scan {countdown}
-              </span>
-            )}
-          </div>
+          <ThemeToggle />
         </div>
         <p className="mt-3 max-w-3xl text-[15px] leading-relaxed" style={{ color: "var(--ink-secondary)" }}>
           A machine-learning momentum model — validated over 3,600 equity backtests — picks the
@@ -139,6 +134,9 @@ export default function Dashboard() {
         </h2>
         <EquityChart data={snap.equitySeries} />
       </section>
+
+      <TradeHistory />
+      <DailyPnl />
 
       {/* ---- Open positions with payoff ---- */}
       <section className="card mb-6 p-5">
@@ -227,11 +225,18 @@ export default function Dashboard() {
             </span>
           ))}
         </div>
-        <div>
+        <div className="text-right">
           Built for the Alpaca AI Trading Agents Hackathon · account {account.number} ·
           refreshes every 15s · not financial advice
+          <br />
+          Crafted at{" "}
+          <a href="https://geekendzone.com" target="_blank" rel="noopener noreferrer"
+            className="font-medium underline-offset-2 hover:underline" style={{ color: "var(--accent)" }}>
+            GeekendZone
+          </a>
         </div>
       </footer>
     </main>
+    </>
   );
 }

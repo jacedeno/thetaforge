@@ -22,6 +22,20 @@ def run_monitor(dry_run: bool = True) -> None:
         os.environ["ALPACA_API_KEY"], os.environ["ALPACA_SECRET_KEY"]
     )
 
+    # Reconcile the trade journal against the broker's filled orders.
+    try:
+        import requests as _rq
+        from agent import journal
+        r = _rq.get(
+            "https://paper-api.alpaca.markets/v2/orders",
+            params={"status": "closed", "asset_class": "us_option", "limit": "500", "nested": "true"},
+            headers=broker._headers(), timeout=30,
+        )
+        if r.ok:
+            journal.reconcile(r.json())
+    except Exception:
+        log.exception("journal reconcile failed — continuing")
+
     positions = broker.option_positions()
     spreads = reconstruct_spreads(positions)
     log.info("monitor: %d option leg(s) -> %d spread(s)", len(positions), len(spreads))
