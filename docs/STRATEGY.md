@@ -59,6 +59,8 @@ $0.63 (price improvement).
 
 Max risk per position (width − credit) ≤ 2% of account equity.
 Total buying-power usage ≤ 50%.
+These sit inside the canonical band for short-premium systems — the derivation
+and literature comparison live in [`risk-sizing.md`](risk-sizing.md).
 
 ## Open questions (resolve during dev-account testing, Aug 24–27)
 
