@@ -27,3 +27,4 @@ logs/
 .idea/
 .vscode/
 .playwright-cli/
+archive/
