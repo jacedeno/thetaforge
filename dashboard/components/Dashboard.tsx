@@ -131,10 +131,8 @@ export default function Dashboard() {
 
       {/* ---- Equity curve ---- */}
       <section className="card mb-6 p-5">
-        <h2 className="mb-3 text-sm font-medium" style={{ color: "var(--ink-secondary)" }}>
-          Equity — last week
-        </h2>
-        <EquityChart data={snap.equitySeries} />
+        <h2 className="mb-3 font-display text-base font-semibold">Equity</h2>
+        <EquityChart />
       </section>
 
       <TradeHistory />

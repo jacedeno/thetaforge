@@ -6,6 +6,8 @@ import TradeDetail from "./TradeDetail";
 export interface Trade {
   open_order_id: string;
   underlying: string;
+  short_symbol: string;
+  long_symbol: string;
   short_strike: number;
   long_strike: number;
   expiration: string;

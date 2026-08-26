@@ -6,6 +6,16 @@ import {
 } from "lightweight-charts";
 import type { Trade } from "./TradeHistory";
 
+const TIMEFRAMES = ["5Min", "15Min", "30Min", "1Hour", "1Day"] as const;
+const TF_LABEL: Record<string, string> = {
+  "5Min": "5m", "15Min": "15m", "30Min": "30m", "1Hour": "1h", "1Day": "1d",
+};
+
+interface Txn {
+  at: string | null; symbol: string; side: string;
+  qty: string; price: string | null; opening: boolean;
+}
+
 function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -14,6 +24,15 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [themeTick, setThemeTick] = useState(0);
+  const [tf, setTf] = useState("15Min");
+  const [txns, setTxns] = useState<Txn[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/trade-orders?short=${trade.short_symbol}&long=${trade.long_symbol}`)
+      .then((r) => r.json())
+      .then((j) => setTxns(j.transactions ?? []))
+      .catch(() => {});
+  }, [trade.short_symbol, trade.long_symbol]);
 
   useEffect(() => {
     const mo = new MutationObserver(() => setThemeTick((t) => t + 1));
@@ -32,7 +51,7 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
 
     let disposed = false;
 
-    fetch(`/api/bars?symbol=${trade.underlying}&from=${from}&to=${to}`)
+    fetch(`/api/bars?symbol=${trade.underlying}&from=${from}&to=${to}&tf=${tf}`)
       .then((r) => r.json())
       .then(({ bars }: { bars: CandlestickData<Time>[] }) => {
         if (disposed || !bars?.length) return;
@@ -116,7 +135,7 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [trade, themeTick]);
+  }, [trade, themeTick, tf]);
 
   const holding = trade.close_ts
     ? `${Math.round((new Date(trade.close_ts).getTime() - new Date(trade.open_ts).getTime()) / 3_600_000)}h`
@@ -124,8 +143,58 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
 
   return (
     <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: "var(--grid)" }}>
+      <div className="mb-2 flex justify-end gap-1" role="group" aria-label="Chart timeframe">
+        {TIMEFRAMES.map((t) => (
+          <button key={t} onClick={() => setTf(t)} aria-pressed={t === tf}
+            className="font-mono2 rounded px-2 py-0.5 text-xs transition-opacity hover:opacity-80"
+            style={t === tf
+              ? { background: "var(--surface-1)", color: "var(--ink-primary)" }
+              : { color: "var(--ink-muted)" }}>
+            {TF_LABEL[t]}
+          </button>
+        ))}
+      </div>
       <div ref={ref} className="w-full" />
-      <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] sm:grid-cols-4"
+      {txns.length > 0 && (
+        <div className="mt-4">
+          <div className="eyebrow mb-2">transactions</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <tbody>
+                {txns.map((t, i) => (
+                  <tr key={i} className="border-b last:border-b-0" style={{ borderColor: "var(--grid)" }}>
+                    <td className="py-1.5 pr-3 whitespace-nowrap" style={{ color: "var(--ink-muted)" }}>
+                      {t.at ? new Date(t.at).toLocaleString("en-US",
+                        { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                    </td>
+                    <td className="py-1.5 pr-3 font-mono2 text-xs">{t.symbol}</td>
+                    <td className="py-1.5 pr-3 font-medium"
+                      style={{ color: t.side === "SELL" ? "var(--delta-up)" : "var(--delta-down)" }}>
+                      {t.side}
+                    </td>
+                    <td className="py-1.5 pr-3" style={{ color: "var(--ink-muted)" }}>
+                      {t.opening ? "open" : "close"}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right">{t.qty}</td>
+                    <td className="py-1.5 text-right">{t.price ? `$${t.price}` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-2 flex justify-between border-t pt-2 text-[13px]"
+            style={{ borderColor: "var(--grid)" }}>
+            <span style={{ color: "var(--ink-secondary)" }}>Net gain</span>
+            <span className="font-semibold"
+              style={{ color: (trade.realized_pl ?? 0) >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}>
+              {trade.realized_pl == null ? "open" :
+                `${trade.realized_pl >= 0 ? "+" : ""}$${trade.realized_pl.toFixed(2)}`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] sm:grid-cols-4"
         style={{ color: "var(--ink-secondary)" }}>
         <div><span className="eyebrow">structure</span><br />
           {trade.short_strike}/{trade.long_strike} put credit ×{trade.qty}</div>
