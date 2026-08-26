@@ -64,6 +64,13 @@ def run_monitor(dry_run: bool = True) -> None:
         legs = spread_legs(o)
         if legs is None:
             continue
+        # If another fill already established this underlying, the signal is
+        # satisfied — a reprice here would double the position.
+        underlying = parse_occ(legs[0]).root
+        if any(parse_occ(p.symbol).root == underlying for p in broker.option_positions()):
+            events.emit("order_reprice_skipped", short=legs[0],
+                        reason="position already exists in underlying")
+            continue
         try:
             from alpaca.data.requests import OptionLatestQuoteRequest
 

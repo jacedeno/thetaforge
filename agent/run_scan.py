@@ -37,6 +37,15 @@ def run_scan(dry_run: bool = True) -> None:
     from agent.execution.monitor import parse_occ
 
     held = {parse_occ(p.symbol).root for p in positions}
+    # An order in flight is a claim on its underlying: without this, a signal
+    # that repeats across scans stacks a second order on top of the first —
+    # observed live 2026-08-26 as a doubled HD position at 2x the risk budget.
+    for o in broker.open_option_orders():
+        for leg in getattr(o, "legs", None) or []:
+            try:
+                held.add(parse_occ(leg.symbol).root)
+            except ValueError:
+                pass
 
     opened_this_scan = 0
     for sig in signals:
