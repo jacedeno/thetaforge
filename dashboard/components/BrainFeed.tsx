@@ -15,6 +15,9 @@ const COLORS: Record<string, string> = {
   order_open: "var(--good)",
   exit_signal: "var(--series-2)",
   order_close: "var(--series-2)",
+  order_stale: "var(--ink-muted)",
+  order_reprice: "var(--series-1)",
+  order_reprice_skipped: "var(--ink-muted)",
 };
 
 function line(e: Ev): string {
@@ -25,6 +28,9 @@ function line(e: Ev): string {
     case "order_open": return `OPEN ${e.symbol} credit spread x${e.qty} @ $${e.credit} credit · max risk $${e.max_risk} · Δ${e.delta}`;
     case "exit_signal": return `exit ${e.symbol} — ${e.reason}`;
     case "order_close": return `CLOSE ${e.symbol} x${e.qty} @ $${e.limit} — ${e.reason}`;
+    case "order_stale": return `entry unfilled for ${e.age_s}s — cancelled`;
+    case "order_reprice": return `REPRICE at natural $${e.natural} x${e.qty} — trading price for certainty`;
+    case "order_reprice_skipped": return `reprice skipped — ${e.reason}`;
     default: return JSON.stringify(e);
   }
 }

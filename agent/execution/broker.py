@@ -44,26 +44,27 @@ class Broker:
 
     def open_credit_spread(self, spread: SpreadCandidate, qty: int, limit_credit: float) -> dict:
         """Sell-to-open a credit spread at a net credit limit (positive input)."""
+        return self.open_spread_symbols(
+            spread.short_symbol, spread.long_symbol, qty, limit_credit,
+            client_order_id=f"tf-open-{spread.underlying}-{uuid.uuid4().hex[:8]}",
+        )
+
+    def open_spread_symbols(
+        self, short_symbol: str, long_symbol: str, qty: int,
+        limit_credit: float, client_order_id: str | None = None,
+    ) -> dict:
         payload = {
             "order_class": "mleg",
             "qty": str(qty),
             "type": "limit",
             "limit_price": str(-abs(round(limit_credit, 2))),  # negative = credit
             "time_in_force": "day",
-            "client_order_id": f"tf-open-{spread.underlying}-{uuid.uuid4().hex[:8]}",
+            "client_order_id": client_order_id or f"tf-open-{uuid.uuid4().hex[:8]}",
             "legs": [
-                {
-                    "symbol": spread.short_symbol,
-                    "ratio_qty": "1",
-                    "side": "sell",
-                    "position_intent": "sell_to_open",
-                },
-                {
-                    "symbol": spread.long_symbol,
-                    "ratio_qty": "1",
-                    "side": "buy",
-                    "position_intent": "buy_to_open",
-                },
+                {"symbol": short_symbol, "ratio_qty": "1",
+                 "side": "sell", "position_intent": "sell_to_open"},
+                {"symbol": long_symbol, "ratio_qty": "1",
+                 "side": "buy", "position_intent": "buy_to_open"},
             ],
         }
         return self._post_order(payload)

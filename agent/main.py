@@ -60,9 +60,12 @@ def run_loop(dry_run: bool) -> None:
             if open_now:
                 now = datetime.now(timezone.utc)
                 slot = f"{now.hour}:{now.minute // 15}"   # changes at each 15m boundary
-                # Scan ~30s after the boundary so the just-closed bar is available.
-                if slot != last_scan_slot and now.minute % 15 == 0:
-                    time.sleep(30)
+                # Fire once per quarter, whenever the first iteration of that
+                # quarter lands — never require hitting the exact boundary
+                # minute, which the loop's natural drift will eventually skip.
+                if slot != last_scan_slot:
+                    if now.minute % 15 == 0 and now.second < 30:
+                        time.sleep(30 - now.second)  # let the bar close
                     run_scan(dry_run=dry_run)
                     last_scan_slot = slot
                     last_scan_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")

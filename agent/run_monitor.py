@@ -43,10 +43,12 @@ def run_monitor(dry_run: bool = True) -> None:
     if not spreads:
         return
 
-    # Cancel entry orders that went stale before filling — the credit they ask
-    # for no longer exists once the underlying has moved.
+    # A stale entry gets one second chance at the NATURAL price before dying.
+    # The paper simulator has no market makers: a limit fills only when it
+    # crosses the NBBO, so mid-anchored orders mostly sit. Real fills beat
+    # perfect prices in a P&L-judged environment.
     open_orders = broker.open_option_orders()
-    from agent.execution.stale import select_stale
+    from agent.execution.stale import is_retry, select_stale, spread_legs
 
     for o in select_stale(open_orders, cfg.strategy.order_stale_after_s):
         try:
@@ -56,6 +58,35 @@ def run_monitor(dry_run: bool = True) -> None:
                         age_s=int(cfg.strategy.order_stale_after_s))
         except Exception:
             log.exception("could not cancel stale order %s", o.id)
+            continue
+        if is_retry(o):
+            continue  # one reprice per spread — never chase further
+        legs = spread_legs(o)
+        if legs is None:
+            continue
+        try:
+            from alpaca.data.requests import OptionLatestQuoteRequest
+
+            quotes = option_data.get_option_latest_quote(
+                OptionLatestQuoteRequest(symbol_or_symbols=list(legs)))
+            sq, lq = quotes.get(legs[0]), quotes.get(legs[1])
+            if not sq or not lq or not sq.bid_price or not lq.ask_price:
+                continue
+            natural = round(sq.bid_price - lq.ask_price, 2)
+            if natural < cfg.strategy.min_credit_usd:
+                events.emit("order_reprice_skipped", short=legs[0],
+                            reason=f"natural credit {natural} below floor")
+                continue
+            import uuid as _uuid
+
+            order = broker.open_spread_symbols(
+                legs[0], legs[1], int(float(o.qty)), natural,
+                client_order_id=f"tf-retry-{_uuid.uuid4().hex[:8]}")
+            log.info("repriced stale entry at natural %.2f -> order %s", natural, order["id"])
+            events.emit("order_reprice", short=legs[0], long=legs[1],
+                        qty=int(float(o.qty)), natural=natural, status=order["status"])
+        except Exception:
+            log.exception("reprice failed for %s", o.id)
     open_orders = [o for o in open_orders if o not in select_stale(open_orders, cfg.strategy.order_stale_after_s)]
 
     # Symbols with an open (pending) order are skipped to avoid duplicates.

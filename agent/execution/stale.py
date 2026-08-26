@@ -49,3 +49,20 @@ def select_stale(orders: list, max_age_s: int, now: datetime | None = None) -> l
         and float(getattr(o, "filled_qty", 0) or 0) == 0
         and age_seconds(o, now) > max_age_s
     ]
+
+
+def spread_legs(order) -> tuple[str, str] | None:
+    """(short_symbol, long_symbol) of a two-leg entry order, else None."""
+    legs = getattr(order, "legs", None) or []
+    if len(legs) != 2:
+        return None
+    short = next((l for l in legs if _intent(l) == "sell_to_open"), None)
+    long_ = next((l for l in legs if _intent(l) == "buy_to_open"), None)
+    if short is None or long_ is None:
+        return None
+    return short.symbol, long_.symbol
+
+
+def is_retry(order) -> bool:
+    cid = str(getattr(order, "client_order_id", "") or "")
+    return cid.startswith("tf-retry")
