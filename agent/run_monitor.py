@@ -14,7 +14,7 @@ def run_monitor(dry_run: bool = True) -> None:
 
     from agent.config import Config
     from agent.execution.broker import Broker
-    from agent.execution.monitor import evaluate_exit, reconstruct_spreads
+    from agent.execution.monitor import evaluate_exit, parse_occ, reconstruct_spreads
 
     cfg = Config()
     broker = Broker()

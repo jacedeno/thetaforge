@@ -72,3 +72,44 @@ def test_reconstruct_pairs_legs():
     assert s.underlying == "NVDA"
     assert s.qty == 5
     assert s.entry_credit == 1.10
+
+
+def test_run_monitor_names_resolve():
+    """The monitor's module-level and function-level names must all import.
+
+    A NameError inside run_monitor is swallowed by the loop's blanket
+    try/except and silently disables exits and cancels — this happened live
+    on 2026-08-26 when parse_occ was used without its import.
+    """
+    import ast, inspect
+    import agent.run_monitor as m
+
+    src = inspect.getsource(m)
+    tree = ast.parse(src)
+    # every Name used inside run_monitor must be importable/defined
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "run_monitor")
+    imported = set()
+    for node in ast.walk(fn):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for a in node.names:
+                imported.add(a.asname or a.name.split(".")[0])
+    used = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    module_names = set(dir(m)) | imported | set(dir(__builtins__)) | {
+        "log", "dry_run", "cfg", "broker", "option_data", "events",
+    }
+    # locals assigned within the function (assignments, for-targets, comprehensions, with, except)
+    assigned = set()
+    for n in ast.walk(fn):
+        if isinstance(n, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.For, ast.withitem)):
+            for t in ast.walk(n):
+                if isinstance(t, ast.Name):
+                    assigned.add(t.id)
+        if isinstance(n, ast.comprehension):
+            for t in ast.walk(n.target):
+                if isinstance(t, ast.Name):
+                    assigned.add(t.id)
+        if isinstance(n, ast.ExceptHandler) and n.name:
+            assigned.add(n.name)
+    missing = used - module_names - assigned - {"__builtins__"}
+    leftovers = {x for x in missing if not hasattr(__import__("builtins"), x)}
+    assert not leftovers, f"names used in run_monitor but never defined: {leftovers}"
