@@ -18,6 +18,8 @@ const COLORS: Record<string, string> = {
   order_stale: "var(--ink-muted)",
   order_reprice: "var(--series-1)",
   order_reprice_skipped: "var(--ink-muted)",
+  position_unmanageable: "var(--critical)",
+  journal_price_mismatch: "var(--ink-secondary)",
 };
 
 function friendlyVeto(reason: string): string {
@@ -61,6 +63,10 @@ function line(e: Ev): string {
       return `${e.symbol}: ${friendlyExit(String(e.reason ?? ""))}`;
     case "order_close":
       return `buying back ${e.symbol} ×${e.qty} at $${e.limit} — ${friendlyExit(String(e.reason ?? ""))}`;
+    case "position_unmanageable":
+      return `${e.symbol}: credit $${e.credit} is too small to manage — holding to the time stop instead of paying the spread to exit`;
+    case "journal_price_mismatch":
+      return `order ${e.client_order_id ?? e.order_id}: parent and leg fill prices disagree by $${e.divergence} — trusting the legs`;
     default:
       return JSON.stringify(e);
   }

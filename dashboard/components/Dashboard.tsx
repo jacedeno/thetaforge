@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import EquityChart from "./EquityChart";
 import PayoffDiagram from "./PayoffDiagram";
+import PositionDetail from "./PositionDetail";
 import BrainFeed from "./BrainFeed";
 import StatusStrip from "./StatusStrip";
 import ThemeToggle from "./ThemeToggle";
@@ -11,6 +12,8 @@ import DailyPnl from "./DailyPnl";
 
 interface Spread {
   underlying: string;
+  shortSymbol: string;
+  longSymbol: string;
   shortStrike: number;
   longStrike: number;
   expiration: string;
@@ -66,6 +69,7 @@ export default function Dashboard() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [countdown, setCountdown] = useState("--:--");
+  const [openPos, setOpenPos] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -149,45 +153,64 @@ export default function Dashboard() {
           </p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {spreads.map((s) => (
-              <div key={s.underlying + s.expiration}
-                className="flex items-center justify-between rounded-lg border p-4"
-                style={{ borderColor: "var(--grid)" }}>
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-lg font-semibold">{s.underlying}</span>
-                    <span className="text-sm" style={{ color: "var(--ink-secondary)" }}>
-                      {s.shortStrike}/{s.longStrike} put credit ×{s.qty}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
-                    exp {s.expiration} · {s.dte}d · credit {usd2(s.entryCredit)}
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-4">
+            {spreads.map((s) => {
+              const key = s.underlying + s.expiration;
+              const expanded = openPos === key;
+              return (
+                <div key={key}
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor: "var(--grid)",
+                    gridColumn: expanded ? "1 / -1" : undefined,
+                  }}>
+                  <button onClick={() => setOpenPos(expanded ? null : key)}
+                    className="flex w-full items-center justify-between gap-3 text-left hover:opacity-90"
+                    aria-expanded={expanded}>
                     <div>
-                      <div className="eyebrow" title="Midpoint of the current bid/ask — a live quote, and where the spread would realistically trade">
-                        at mid
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-semibold">{s.underlying}</span>
+                        <span className="text-sm" style={{ color: "var(--ink-secondary)" }}>
+                          {s.shortStrike}/{s.longStrike} put credit ×{s.qty}
+                        </span>
                       </div>
-                      <div className="text-lg font-semibold"
-                        style={{ color: (s.midPl ?? 0) >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}>
-                        {s.midPl == null ? "—" : `${s.midPl >= 0 ? "+" : ""}${usd2(s.midPl)}`}
+                      <div className="mt-1 text-sm" style={{ color: "var(--ink-muted)" }}>
+                        exp {s.expiration} · {s.dte}d · credit {usd2(s.entryCredit)}
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-4">
+                        <div>
+                          <div className="eyebrow" title="Midpoint of the current bid/ask — a live quote, and where the spread would realistically trade">
+                            at mid
+                          </div>
+                          <div className="text-lg font-semibold"
+                            style={{ color: (s.midPl ?? 0) >= 0 ? "var(--delta-up)" : "var(--delta-down)" }}>
+                            {s.midPl == null ? "—" : `${s.midPl >= 0 ? "+" : ""}${usd2(s.midPl)}`}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="eyebrow" title="The broker's own position mark, which can lag the live quote in thin option chains">
+                            broker mark
+                          </div>
+                          <div className="text-sm font-medium"
+                            style={{ color: "var(--ink-muted)" }}>
+                            {s.unrealizedPl >= 0 ? "+" : ""}{usd2(s.unrealizedPl)}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <div className="eyebrow" title="The broker's own position mark, which can lag the live quote in thin option chains">
-                        broker mark
-                      </div>
-                      <div className="text-sm font-medium"
-                        style={{ color: "var(--ink-muted)" }}>
-                        {s.unrealizedPl >= 0 ? "+" : ""}{usd2(s.unrealizedPl)}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      {!expanded && (
+                        <PayoffDiagram shortStrike={s.shortStrike} longStrike={s.longStrike}
+                          credit={s.entryCredit} spot={spots[s.underlying]} />
+                      )}
+                      <span className="shrink-0" style={{ color: "var(--ink-muted)" }}>
+                        {expanded ? "▾" : "▸"}
+                      </span>
                     </div>
-                  </div>
+                  </button>
+                  {expanded && <PositionDetail spread={s} spot={spots[s.underlying]} />}
                 </div>
-                <PayoffDiagram shortStrike={s.shortStrike} longStrike={s.longStrike}
-                  credit={s.entryCredit} spot={spots[s.underlying]} />
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

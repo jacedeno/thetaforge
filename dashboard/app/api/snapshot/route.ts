@@ -1,5 +1,27 @@
 import { NextResponse } from "next/server";
+import Database from "better-sqlite3";
+import path from "path";
 import { alpaca, parseOcc } from "@/lib/alpaca";
+
+/** Fill-derived entry credits for open trades, keyed "short|long".
+ *  The journal is the single source of truth for entry_credit — the
+ *  avg_entry_price derivation below is only the fallback (it averages
+ *  across multiple fills on the same legs, which the 2026-08-26 doubled
+ *  HD position showed drifting 4c from the surviving trade's real fill). */
+function journalCredits(): Map<string, number> {
+  try {
+    const db = new Database(path.join(process.cwd(), "..", "data", "thetaforge.db"), {
+      readonly: true, fileMustExist: true,
+    });
+    const rows = db.prepare(
+      "SELECT short_symbol, long_symbol, entry_credit FROM trades WHERE status = 'open'",
+    ).all() as { short_symbol: string; long_symbol: string; entry_credit: number }[];
+    db.close();
+    return new Map(rows.map((r) => [`${r.short_symbol}|${r.long_symbol}`, r.entry_credit]));
+  } catch {
+    return new Map();
+  }
+}
 
 async function latestOptionQuotes(symbols: string[]): Promise<Record<string, number>> {
   if (symbols.length === 0) return {};
@@ -66,7 +88,7 @@ interface Spread {
   dte: number;
 }
 
-function reconstructSpreads(positions: RawPosition[]): Spread[] {
+function reconstructSpreads(positions: RawPosition[], credits: Map<string, number>): Spread[] {
   const shorts = new Map<string, RawPosition>();
   const longs = new Map<string, RawPosition>();
   for (const p of positions) {
@@ -83,7 +105,9 @@ function reconstructSpreads(positions: RawPosition[]): Spread[] {
     const sc = parseOcc(sp.symbol)!;
     const lc = parseOcc(lp.symbol)!;
     const qty = Math.abs(parseFloat(sp.qty));
-    const entryCredit = parseFloat(sp.avg_entry_price) - parseFloat(lp.avg_entry_price);
+    const entryCredit =
+      credits.get(`${sp.symbol}|${lp.symbol}`) ??
+      parseFloat(sp.avg_entry_price) - parseFloat(lp.avg_entry_price);
     const currentCost = parseFloat(sp.current_price) - parseFloat(lp.current_price);
     const dte = Math.round(
       (new Date(sc.expiration + "T21:00:00Z").getTime() - today.getTime()) / 86_400_000,
@@ -122,7 +146,7 @@ export async function GET() {
     ]);
 
     const optionPositions = positionsRaw.filter((p) => p.asset_class === "us_option");
-    const spreads = reconstructSpreads(optionPositions);
+    const spreads = reconstructSpreads(optionPositions, journalCredits());
     const spots = await latestSpots([...new Set(spreads.map((s) => s.underlying))]);
     const optQuotes = await latestOptionQuotes(
       spreads.flatMap((s) => [s.shortSymbol, s.longSymbol]),

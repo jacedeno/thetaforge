@@ -24,7 +24,9 @@ export async function GET() {
       pl: history.profit_loss[i] ?? 0,
       live: false,
     }))
-    .filter((d) => d.date < todayKey && d.pl !== 0);
+    .filter((d) => d.date < todayKey);
+  // Trim pre-funding zero padding only — a real flat session mid-stream stays.
+  while (days.length && days[0].pl === 0) days.shift();
 
   days.push({
     date: todayKey,

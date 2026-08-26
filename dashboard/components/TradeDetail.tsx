@@ -20,11 +20,27 @@ function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+export function formatHolding(ms: number): string {
+  if (ms < 90_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 90 * 60_000) return `${Math.round(ms / 60_000)}m`;
+  if (ms < 48 * 3_600_000) return `${(ms / 3_600_000).toFixed(1)}h`;
+  return `${(ms / 86_400_000).toFixed(1)}d`;
+}
+
+export function defaultTf(holdingMs: number): string {
+  if (holdingMs <= 2 * 3_600_000) return "5Min";
+  if (holdingMs <= 2 * 86_400_000) return "15Min";
+  return "1Hour";
+}
+
 export default function TradeDetail({ trade }: { trade: Trade }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [themeTick, setThemeTick] = useState(0);
-  const [tf, setTf] = useState("15Min");
+  const holdingMs =
+    (trade.close_ts ? new Date(trade.close_ts).getTime() : Date.now()) -
+    new Date(trade.open_ts).getTime();
+  const [tf, setTf] = useState(() => defaultTf(holdingMs));
   const [txns, setTxns] = useState<Txn[]>([]);
 
   useEffect(() => {
@@ -46,10 +62,15 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
 
     const openMs = new Date(trade.open_ts).getTime();
     const closeMs = trade.close_ts ? new Date(trade.close_ts).getTime() : Date.now();
-    const from = new Date(openMs - 2 * 86_400_000).toISOString();
-    const to = new Date(Math.min(closeMs + 1 * 86_400_000, Date.now() - 16 * 60_000)).toISOString();
+    // Size the window to the trade: a minutes-long trade gets a session-scale
+    // view instead of the same fixed ±days a week-long trade needs.
+    const span = Math.max(closeMs - openMs, 60_000);
+    const pad = Math.max(span * 2, 3 * 3_600_000);
+    const from = new Date(openMs - pad).toISOString();
+    const to = new Date(Math.min(closeMs + pad, Date.now() - 16 * 60_000)).toISOString();
 
     let disposed = false;
+    let onResizeRef: (() => void) | null = null;
 
     fetch(`/api/bars?symbol=${trade.underlying}&from=${from}&to=${to}&tf=${tf}`)
       .then((r) => r.json())
@@ -124,22 +145,49 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
           if (!disposed) createSeriesMarkers(series, markers);
         });
 
-        chart.timeScale().fitContent();
+        // A logical (bar-index) range survives overnight/weekend session gaps
+        // that a time range would stretch across. Short trades get a window
+        // around their markers; long ones still fit everything.
+        const idx = (ms: number) => {
+          let best = 0;
+          bars.forEach((b, i) => {
+            if (Math.abs((b.time as number) * 1000 - ms) <
+                Math.abs((bars[best].time as number) * 1000 - ms)) best = i;
+          });
+          return best;
+        };
+        const iOpen = idx(openMs), iClose = idx(closeMs);
+        if (iClose - iOpen < bars.length / 3) {
+          const padBars = Math.max(12, (iClose - iOpen) * 2);
+          chart.timeScale().setVisibleLogicalRange({
+            from: Math.max(0, iOpen - padBars),
+            to: Math.min(bars.length - 1, iClose + padBars),
+          });
+        } else {
+          chart.timeScale().fitContent();
+        }
         const onResize = () => chart.applyOptions({ width: el.clientWidth });
         onResize();
         window.addEventListener("resize", onResize);
+        onResizeRef = onResize;
       });
 
     return () => {
       disposed = true;
+      if (onResizeRef) window.removeEventListener("resize", onResizeRef);
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [trade, themeTick, tf]);
+    // Scalar deps only: TradeHistory hands us a NEW trade object every 30s
+    // poll — depending on the object identity rebuilt the chart twice a
+    // minute and wiped any zoom the user had.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trade.open_order_id, trade.open_ts, trade.close_ts, trade.underlying,
+      trade.short_strike, trade.long_strike, trade.entry_credit,
+      trade.exit_debit, trade.qty, themeTick, tf]);
 
-  const holding = trade.close_ts
-    ? `${Math.round((new Date(trade.close_ts).getTime() - new Date(trade.open_ts).getTime()) / 3_600_000)}h`
-    : "open";
+  const quickFlip = trade.close_ts != null && holdingMs < 15 * 60_000;
+  const holding = trade.close_ts ? formatHolding(holdingMs) : "open";
 
   return (
     <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: "var(--grid)" }}>
@@ -200,7 +248,12 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
           {trade.short_strike}/{trade.long_strike} put credit ×{trade.qty}</div>
         <div><span className="eyebrow">entry → exit</span><br />
           {trade.entry_credit.toFixed(2)}cr → {trade.exit_debit != null ? `${trade.exit_debit.toFixed(2)}db` : "—"}</div>
-        <div><span className="eyebrow">holding</span><br />{holding} · exp {trade.expiration}</div>
+        <div><span className="eyebrow">holding</span><br />
+          <span
+            style={quickFlip ? { color: "var(--critical)", fontWeight: 600 } : undefined}
+            title={quickFlip ? "closed within one monitor pass — worth a look at why" : undefined}>
+            {holding}
+          </span>{" "}· exp {trade.expiration}</div>
         <div><span className="eyebrow">why</span><br />
           {trade.signal_strength != null ? `signal ${trade.signal_strength}` : "—"}
           {trade.exit_reason ? ` → ${trade.exit_reason}` : ""}</div>

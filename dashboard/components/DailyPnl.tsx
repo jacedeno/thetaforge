@@ -15,6 +15,7 @@ function token(name: string): string {
 export default function DailyPnl() {
   const ref = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
+  const [themeTick, setThemeTick] = useState(0);
   const [days, setDays] = useState<{ date: string; pl: number; live: boolean }[]>([]);
 
   useEffect(() => {
@@ -27,13 +28,35 @@ export default function DailyPnl() {
     return () => clearInterval(t);
   }, []);
 
+  // Re-read CSS tokens when the theme changes (OS setting or data-theme toggle).
   useEffect(() => {
-    if (!ref.current) return;
+    const bump = () => setThemeTick((t) => t + 1);
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", bump);
+    const mo = new MutationObserver(bump);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => {
+      mq.removeEventListener("change", bump);
+      mo.disconnect();
+    };
+  }, []);
+
+  const hasData = days.length > 0;
+
+  // Keyed on hasData: on first render there is no data, the container is not
+  // mounted and ref.current is null — an []-keyed init would never run again
+  // and the chart would stay blank forever.
+  useEffect(() => {
+    if (!ref.current || !hasData) return;
     chart.current = echarts.init(ref.current);
     const onResize = () => chart.current?.resize();
     window.addEventListener("resize", onResize);
-    return () => { window.removeEventListener("resize", onResize); chart.current?.dispose(); };
-  }, []);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      chart.current?.dispose();
+      chart.current = null;
+    };
+  }, [hasData]);
 
   useEffect(() => {
     if (!chart.current || days.length === 0) return;
@@ -71,9 +94,8 @@ export default function DailyPnl() {
         barMaxWidth: 24,
       }],
     });
-  }, [days]);
+  }, [days, themeTick, hasData]);
 
-  if (days.length === 0) return null;
   return (
     <section className="card mb-6 p-5">
       <div className="mb-3 flex items-baseline justify-between">
@@ -82,7 +104,14 @@ export default function DailyPnl() {
           today updates live — the lighter bar is still in motion
         </span>
       </div>
-      <div ref={ref} className="h-48 w-full" />
+      {hasData ? (
+        <div ref={ref} className="h-48 w-full" />
+      ) : (
+        <div className="flex h-48 items-center justify-center text-sm"
+          style={{ color: "var(--ink-muted)" }}>
+          No closed sessions yet — bars appear after the first full trading day.
+        </div>
+      )}
     </section>
   );
 }

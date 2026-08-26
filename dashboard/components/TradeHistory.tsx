@@ -20,6 +20,7 @@ export interface Trade {
   exit_reason: string | null;
   signal_strength: number | null;
   status: string;
+  source?: string;   // 'agent' | 'manual' — manual rows are badged and excluded from stats
 }
 
 interface Stats {
@@ -107,6 +108,13 @@ export default function TradeHistory() {
                   <span className="w-16 shrink-0 font-semibold">{t.underlying}</span>
                   <span className="hidden flex-1 sm:block" style={{ color: "var(--ink-secondary)" }}>
                     {t.short_strike}/{t.long_strike} put credit ×{t.qty}
+                    {t.source === "manual" && (
+                      <span className="ml-2 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide"
+                        style={{ borderColor: "var(--grid)", color: "var(--ink-muted)" }}
+                        title="Placed outside the agent (smoke test / manual order) — excluded from the stats above">
+                        manual
+                      </span>
+                    )}
                   </span>
                   <span className="w-14 shrink-0 rounded-full px-2 py-0.5 text-center text-xs font-medium"
                     style={{

@@ -12,6 +12,7 @@ export async function GET() {
     interface TradeRow {
       status: string; realized_pl: number | null;
       entry_credit: number; exit_debit: number | null; qty: number;
+      source?: string;
       [k: string]: unknown;
     }
     const trades = db.prepare(
@@ -19,7 +20,10 @@ export async function GET() {
     ).all() as TradeRow[];
     db.close();
 
-    const closed = trades.filter((t) => t.status === "closed");
+    // Manual/out-of-band orders stay visible in the list (badged) but never
+    // count toward the agent's performance stats.
+    const agentTrades = trades.filter((t) => t.source !== "manual");
+    const closed = agentTrades.filter((t) => t.status === "closed");
     const wins = closed.filter((t) => (t.realized_pl ?? 0) > 0);
     const grossWin = wins.reduce((a, t) => a + (t.realized_pl ?? 0), 0);
     const grossLoss = closed
@@ -30,7 +34,7 @@ export async function GET() {
       trades,
       stats: {
         closed: closed.length,
-        open: trades.length - closed.length,
+        open: agentTrades.length - closed.length,
         totalPl: closed.reduce((a, t) => a + (t.realized_pl ?? 0), 0),
         winRate: closed.length ? wins.length / closed.length : null,
         profitFactor: grossLoss > 0 ? grossWin / grossLoss : null,
