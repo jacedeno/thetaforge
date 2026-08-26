@@ -24,6 +24,7 @@ function friendlyVeto(reason: string): string {
   if (reason.includes("chain/liquidity")) return "its options chain isn't liquid enough to trade well";
   if (reason.includes("budget")) return "one spread would exceed the per-position risk budget";
   if (reason.includes("already holding")) return "we already hold a position there";
+  if (reason.includes("sector cap")) return "another name from the same sector is already entering this scan";
   if (reason.includes("max open")) return "the portfolio is at its position limit";
   if (reason.includes("buying power")) return "not enough option buying power right now";
   return reason;
@@ -40,7 +41,7 @@ function line(e: Ev): string {
   switch (e.type) {
     case "scan":
       return e.signals === 0
-        ? `scanned ${e.universe} symbols on the 15-min close — no fresh momentum triggers`
+        ? `scanned ${e.universe} symbols on the 5-min close — no fresh momentum triggers`
         : `scanned ${e.universe} symbols — ${e.signals} momentum trigger${Number(e.signals) > 1 ? "s" : ""} found`;
     case "signal":
       return `${e.symbol} just crossed above its trend at $${e.price} — a candidate`;

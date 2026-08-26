@@ -17,7 +17,9 @@ class StrategyConfig:
     spread_width_max_usd: float = 10.0     # cap for expensive ones
     min_dte: int = 7                       # minimum days to expiration at entry
     max_dte: int = 21                      # maximum days to expiration at entry
-    max_new_positions_per_scan: int = 3    # strongest signals first
+    max_new_positions_per_scan: int = 3    # calmest valid signals first
+    max_signal_strength: float = 0.012     # skip overextended breakouts — they mean-revert
+    max_new_per_sector_per_scan: int = 1   # one fresh bet per sector per scan
     order_stale_after_s: int = 180         # cancel unfilled entries after 3 minutes
     entry_concession_pct: float = 0.03     # shade the entry limit below mid to actually fill
     entry_concession_min: float = 0.01

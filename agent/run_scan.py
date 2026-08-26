@@ -24,7 +24,7 @@ def run_scan(dry_run: bool = True) -> None:
     option_data = OptionHistoricalDataClient(key, secret)
     broker = Broker()
 
-    signals = ml30.scan(stock_data)
+    signals = ml30.scan(stock_data, max_strength=cfg.strategy.max_signal_strength)
     log.info("scan complete: %d signal(s)", len(signals))
     from agent import events
     events.emit("scan", signals=len(signals), universe=80)
@@ -47,11 +47,19 @@ def run_scan(dry_run: bool = True) -> None:
             except ValueError:
                 pass
 
+    sectors = ml30.load_sectors()
+    sector_opened: dict[str, int] = {}
     opened_this_scan = 0
     for sig in signals:
         if opened_this_scan >= cfg.strategy.max_new_positions_per_scan:
             log.info("per-scan entry cap reached — %d signal(s) deferred", len(signals) - signals.index(sig))
             break
+        sector = sectors.get(sig.symbol, "other")
+        if sector_opened.get(sector, 0) >= cfg.strategy.max_new_per_sector_per_scan:
+            log.info("sector cap: skipping %s (%s already entered this scan)", sig.symbol, sector)
+            events.emit("veto", symbol=sig.symbol,
+                        reason=f"sector cap — already entering another {sector} name this scan")
+            continue
         log.info("signal %s LONG @ %.2f strength=%.4f (bar %s)", sig.symbol, sig.close, sig.strength, sig.bar_time)
         events.emit("signal", symbol=sig.symbol, direction="LONG", price=sig.close,
                     strength=round(sig.strength, 4))
@@ -75,6 +83,7 @@ def run_scan(dry_run: bool = True) -> None:
             spread.credit_mid, spread.max_risk_per_spread * qty,
         )
         opened_this_scan += 1
+        sector_opened[sector] = sector_opened.get(sector, 0) + 1
         # An order at the exact mid queues behind the market and mostly sits
         # unfilled; a small concession trades pennies for a filled position.
         concession = max(cfg.strategy.entry_concession_min,

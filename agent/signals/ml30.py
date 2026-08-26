@@ -1,7 +1,9 @@
 """ML30 momentum signal engine.
 
-Triple-confirmation long trigger evaluated on 15-minute bars, all four
-conditions on a single candle close:
+Triple-confirmation long trigger evaluated on 5-minute bars — the timeframe
+of V1-5m, the sweep-winning and live-validated variant of the system (its
+15-minute sibling was retired for lack of live edge). All four conditions
+on a single candle close:
 
     c1: close > SMA55           (above primary moving average)
     c2: prev_close <= prev_SMA55  (fresh-cross filter: fires only on the
@@ -44,10 +46,13 @@ class Signal:
 
     @property
     def strength(self) -> float:
-        """Momentum quality: breakout distance over both SMAs, in fractional terms.
+        """Breakout distance over both SMAs, in fractional terms.
 
-        Used to rank simultaneous signals — a decisive cross scores higher than
-        a marginal one.
+        For the options overlay this is an OVEREXTENSION measure, not a merit
+        score: a violent breakout mean-reverts within hours (observed live
+        2026-08-26 — the two strongest signals were the day's two worst
+        positions), while a calm cross tends to drift. Signals above the
+        ceiling are skipped, and the calmest valid crosses trade first.
         """
         return (self.close / self.sma_slow - 1) + (self.close / self.sma_fast - 1)
 
@@ -56,13 +61,17 @@ def load_universe() -> list[str]:
     return json.loads(_UNIVERSE_PATH.read_text())["symbols"]
 
 
+def load_sectors() -> dict[str, str]:
+    return json.loads(_UNIVERSE_PATH.read_text()).get("sectors", {})
+
+
 def fetch_bars(
-    client: StockHistoricalDataClient, symbols: list[str], days: int = 10
+    client: StockHistoricalDataClient, symbols: list[str], days: int = 4
 ) -> dict[str, pd.DataFrame]:
     """Fetch recent 15-minute bars, keyed by symbol."""
     req = StockBarsRequest(
         symbol_or_symbols=symbols,
-        timeframe=TimeFrame(15, TimeFrameUnit.Minute),
+        timeframe=TimeFrame(5, TimeFrameUnit.Minute),
         start=datetime.now(timezone.utc) - timedelta(days=days),
     )
     bars = client.get_stock_bars(req)
@@ -101,9 +110,15 @@ def evaluate(symbol: str, df: pd.DataFrame) -> Signal | None:
     return None
 
 
-def scan(client: StockHistoricalDataClient, symbols: list[str] | None = None) -> list[Signal]:
-    """Scan the universe; return triggering symbols ranked strongest-first."""
+def scan(
+    client: StockHistoricalDataClient,
+    symbols: list[str] | None = None,
+    max_strength: float | None = None,
+) -> list[Signal]:
+    """Scan the universe; calm crosses first, overextended ones dropped."""
     symbols = symbols or load_universe()
     bars = fetch_bars(client, symbols)
     signals = [s for sym, df in bars.items() if (s := evaluate(sym, df))]
-    return sorted(signals, key=lambda s: s.strength, reverse=True)
+    if max_strength is not None:
+        signals = [s for s in signals if s.strength <= max_strength]
+    return sorted(signals, key=lambda s: s.strength)

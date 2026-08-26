@@ -61,12 +61,12 @@ def run_loop(dry_run: bool) -> None:
                  consecutive_failures=consecutive_failures)
             if open_now:
                 now = datetime.now(timezone.utc)
-                slot = f"{now.hour}:{now.minute // 15}"   # changes at each 15m boundary
-                # Fire once per quarter, whenever the first iteration of that
-                # quarter lands — never require hitting the exact boundary
-                # minute, which the loop's natural drift will eventually skip.
+                slot = f"{now.hour}:{now.minute // 5}"   # changes at each 5m bar close
+                # Fire once per bar, whenever the first iteration of that slot
+                # lands — never require hitting the exact boundary minute,
+                # which the loop's natural drift would eventually skip.
                 if slot != last_scan_slot:
-                    if now.minute % 15 == 0 and now.second < 30:
+                    if now.minute % 5 == 0 and now.second < 30:
                         time.sleep(30 - now.second)  # let the bar close
                     run_scan(dry_run=dry_run)
                     last_scan_slot = slot

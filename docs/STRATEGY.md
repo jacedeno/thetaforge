@@ -23,7 +23,7 @@ Two edges, stacked:
 
 ## Entry rules
 
-- Universe: liquid S&P 500 names with options chains passing liquidity gates
+- Universe: liquid S&P 500 names, 5-minute bars (the V1-5m live-validated variant) with options chains passing liquidity gates
   (open interest ≥ 500/leg, bid-ask ≤ 10% of mid).
 - Expiry: 7–21 DTE at entry.
 - Spread width: $5 (adjust per underlying price).

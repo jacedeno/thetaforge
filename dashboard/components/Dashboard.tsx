@@ -213,8 +213,8 @@ export default function Dashboard() {
           <div>
             <div className="mb-1 font-mono text-xs" style={{ color: "var(--series-1)" }}>01 · SIGNAL</div>
             <b style={{ color: "var(--ink-primary)" }}>ML momentum trigger.</b> A four-condition
-            SMA55/21 crossover system scans the 80 most liquid S&P 500 names on 15-minute bars.
-            Signals are ranked by breakout strength; only the strongest trade.
+            SMA55/21 crossover system scans the 80 most liquid S&P 500 names on 5-minute bars.
+            Overextended breakouts are skipped — calm crosses trade first, one sector per scan.
           </div>
           <div>
             <div className="mb-1 font-mono text-xs" style={{ color: "var(--series-2)" }}>02 · STRUCTURE</div>
