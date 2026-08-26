@@ -1,16 +1,79 @@
-# ThetaForge — One-Page Write-Up (draft)
+# ThetaForge — One-Page Write-Up
 
-> Hackathon deliverable: AI logic, risk gates, and Alpaca infrastructure implementation.
-> To be finalized before submission (Sep 4).
+> Hackathon deliverable: AI logic, risk gates, and Alpaca infrastructure.
 
-## AI logic
+## AI logic — intelligence in the right layers
 
-_TODO: ML momentum model → directional signal → structure selection. Fill in after MVP._
+ThetaForge deliberately splits "AI" into three layers, putting each kind of
+intelligence where it earns its place:
 
-## Risk gates
+**1. The model layer (machine learning, offline).** The directional signal is
+an SMA55/21 triple-confirmation momentum trigger — not hand-picked, but
+selected by a 3,600-backtest sweep across 120 strategy configurations on
+liquid S&P 500 names. The learning happened at design time: the sweep decided
+*which* rule carries edge; the agent executes that rule.
 
-_TODO: enumerate the gate chain with final parameters._
+**2. The execution layer (deterministic, online).** The running agent is
+deterministic Python: scan the 80 most liquid S&P 500 names on each 15-minute
+close, rank fresh momentum crosses by breakout strength, express the strongest
+through ~25-delta put credit spreads (7–21 DTE), and manage exits
+mechanically. Same input, same decision, every time — no hallucination risk
+with live orders, millisecond latency, and every trade auditable down to the
+four boolean conditions that triggered it.
+
+**3. The operator layer (LLM, supervisory).** An AI operator (Claude,
+connected through Alpaca's MCP server) built the system, watches it trade,
+diagnoses failures from the structured event log, and ships fixes — during the
+test week it caught and fixed live: a fill-rate collapse from mid-anchored
+pricing, a stale-order detector defeated by SDK enum stringification, a
+scheduler that skipped scans, and a duplicate-position race.
+
+The thesis: **an LLM inside the order loop adds variance exactly where
+reliability is non-negotiable.** AI designs, supervises and adapts; determinism
+executes. The public "agent brain" feed narrates the deterministic decisions
+in plain language — the intelligence is in the rules, the narration is
+courtesy for the viewer.
+
+## Why premium selling
+
+P&L = volatility risk premium (structural: implied systematically exceeds
+realized — CBOE PUT index, decades of evidence) + the momentum signal as a
+tilt. The signal's job is modest: not predicting rallies, but avoiding selling
+puts into breakdowns. A bullish fresh-cross marks names least likely to crash
+over the spread's life; if the signal added nothing, the system degrades to
+plain systematic premium selling — a documented, survivable floor. Win-rate
+asymmetry does the rest: spreads profit if the underlying rises, stays flat,
+or falls short of ~3–4%.
+
+## Risk gates — every order passes all, one veto kills it
+
+| Gate | Rule |
+|---|---|
+| Position risk | max loss (width − credit) ≤ **2% of equity** |
+| Portfolio | ≤ 10 concurrent positions · ≤ 50% buying power · 1 per underlying |
+| In-flight claim | a pending order reserves its underlying — no stacking |
+| Entry quality | short-leg delta 0.15–0.32 · credit ≥ 12% of width · ≥ $0.15 |
+| Chain liquidity | per-leg bid-ask tight in relative (≤25%) *or* absolute (≤$0.10) terms |
+| Cadence | ≤ 3 new positions per scan, strongest signals first |
+| Exits | 50% of credit → take profit · 2× credit loss → stop · ≤ 2 DTE → close, never carry to expiration |
+| Order hygiene | unfilled entries cancelled at 3 min; one reprice at the market's natural price, never chase further |
+
+Sizing sits inside the canonical band for short-premium systems (1–2% per
+position, fractional-Kelly territory; aggregate worst case 20%).
 
 ## Alpaca infrastructure
 
-_TODO: Trading API + MCP server / CLI roles, paper account setup, order flow diagram._
+- **Alpaca CLI** — the agent's execution layer: every entry, reprice, exit and
+  cancel runs through `alpaca order submit/cancel` with structured JSON and
+  idempotent client order ids; raw REST is an automatic fallback.
+- **Trading API / alpaca-py + Market Data API** — 15-minute equity bars for
+  signals, option chains with greeks for structure selection, live option
+  quotes for exit pricing and mark-vs-mid honesty.
+- **MCP server** — the AI operator's supervision channel: account, orders,
+  chains and docs inspected through MCP during build and live operation.
+- **Paper trading environment** — all of it, end to end.
+
+Every decision lands in a structured event log and a SQLite trade journal
+(broker fills joined with the agent's *why*: signal strength in, exit reason
+out) — rendered live at the public dashboard with per-trade candlesticks,
+strike lines, payoff diagrams and a real-time decision feed.

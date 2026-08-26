@@ -198,7 +198,7 @@ export default function Dashboard() {
           Agent brain — live decision feed
         </h2>
         <p className="mb-3 text-xs" style={{ color: "var(--ink-muted)" }}>
-          Every scan, signal, veto and order, exactly as the agent reasons through it.
+          Deterministic rules, narrated live — every scan, signal, veto and order, exactly as the agent decides them.
         </p>
         <BrainFeed />
       </section>
