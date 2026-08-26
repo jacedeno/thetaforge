@@ -85,7 +85,9 @@ export default function TradeHistory() {
 
       {closed.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--ink-muted)" }}>
-          No completed round trips yet — closed trades will appear here with their full story.
+          {stats && stats.open > 0
+            ? `${stats.open} position${stats.open > 1 ? "s" : ""} in flight — a trade lands here, with its chart and full story, the moment the agent closes it.`
+            : "No completed round trips yet — closed trades will appear here with their full story."}
         </p>
       ) : (
         <div>
