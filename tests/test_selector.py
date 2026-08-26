@@ -1,13 +1,26 @@
+from datetime import date
 from types import SimpleNamespace
 
 from agent.config import RiskConfig, StrategyConfig
-from agent.options.selector import is_tradable, target_width
+from agent.options.selector import _mid, build_put_credit_spread, is_tradable, target_width
 
 S, R = StrategyConfig(), RiskConfig()
 
 
 def q(bid, ask):
     return SimpleNamespace(bid_price=bid, ask_price=ask)
+
+
+def snap(delta, bid, ask):
+    return SimpleNamespace(greeks=SimpleNamespace(delta=delta), latest_quote=q(bid, ask))
+
+
+class FakeChainClient:
+    def __init__(self, chain):
+        self.chain = chain
+
+    def get_option_chain(self, req):
+        return self.chain
 
 
 def test_width_scales_with_price():
@@ -33,6 +46,85 @@ def test_expensive_wide_quote_rejected():
 def test_missing_or_zero_quote_rejected():
     assert not is_tradable(None, R)
     assert not is_tradable(q(0, 1.00), R)
+
+
+def test_crossed_quote_rejected():
+    """bid 1.20 / ask 0.03 passed both branches before 2026-08-26: the
+    negative spread satisfies every width test and the mid looks plausible."""
+    assert _mid(q(1.20, 0.03)) is None
+    assert not is_tradable(q(1.20, 0.03), R)
+
+
+def test_penny_contract_not_rescued_by_absolute_width():
+    """0.01/0.10 is 'nine cents from the mid' — but the mid is noise."""
+    assert not is_tradable(q(0.01, 0.10), R, min_mid=R.min_mid_for_abs_width)
+    # The default keeps the documented cheap-but-real behavior for wings.
+    assert is_tradable(q(0.12, 0.18), R)
+
+
+# ---- build_put_credit_spread on a fake chain -----------------------------
+
+TODAY = date(2026, 8, 26)
+
+
+def spy_chain():
+    """The validated 2026-09-11 spread from docs/alpaca-notes.md: 749/744."""
+    return {
+        "SPY260911P00749000": snap(-0.25, 1.24, 1.36),   # mid 1.30
+        "SPY260911P00744000": snap(-0.21, 0.48, 0.56),   # mid 0.52 -> credit 0.78
+    }
+
+
+def test_build_put_credit_spread_accepts_a_realistic_25_delta_spread():
+    cand = build_put_credit_spread(
+        FakeChainClient(spy_chain()), "SPY", 766.0, S, R, today=TODAY,
+        oi_lookup=lambda s: 1000,
+    )
+    assert cand is not None
+    assert cand.short_strike == 749.0 and cand.long_strike == 744.0
+    assert cand.credit_mid == 0.78
+
+
+def test_open_interest_below_floor_rejected():
+    cand = build_put_credit_spread(
+        FakeChainClient(spy_chain()), "SPY", 766.0, S, R, today=TODAY,
+        oi_lookup=lambda s: 100,
+    )
+    assert cand is None
+
+
+def test_missing_open_interest_rejected():
+    """Unknown OI is a rejection, never a pass-by-default."""
+    cand = build_put_credit_spread(
+        FakeChainClient(spy_chain()), "SPY", 766.0, S, R, today=TODAY,
+        oi_lookup=lambda s: None,
+    )
+    assert cand is None
+
+
+def test_build_rejects_the_2026_08_26_smoke_test_spread():
+    """SPY 700/695 with spot 766: even with bogus in-band greeks and clean
+    quotes, the three-cent credit dies at the floor. The selector could never
+    have produced the incident's spread."""
+    chain = {
+        "SPY260911P00700000": snap(-0.24, 0.35, 0.39),   # mid 0.37
+        "SPY260911P00695000": snap(-0.20, 0.31, 0.37),   # mid 0.34 -> credit 0.03
+    }
+    cand = build_put_credit_spread(
+        FakeChainClient(chain), "SPY", 766.0, S, R, today=TODAY,
+        oi_lookup=lambda s: 1000,
+    )
+    assert cand is None
+
+
+def test_build_rejects_crossed_short_quote():
+    chain = spy_chain()
+    chain["SPY260911P00749000"] = snap(-0.25, 1.36, 0.03)   # crossed
+    cand = build_put_credit_spread(
+        FakeChainClient(chain), "SPY", 766.0, S, R, today=TODAY,
+        oi_lookup=lambda s: 1000,
+    )
+    assert cand is None
 
 
 def test_delta_band_excludes_at_the_money():

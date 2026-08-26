@@ -7,14 +7,24 @@ import os
 
 log = logging.getLogger("thetaforge")
 
+# One position_unmanageable event per symbol per process — the condition
+# repeats every pass for as long as the spread is held.
+_flagged_unmanageable: set[str] = set()
+
 
 def run_monitor(dry_run: bool = True) -> None:
     from alpaca.data.historical.option import OptionHistoricalDataClient
     from alpaca.data.requests import OptionLatestQuoteRequest
 
+    from agent import journal
     from agent.config import Config
     from agent.execution.broker import Broker
-    from agent.execution.monitor import evaluate_exit, parse_occ, reconstruct_spreads
+    from agent.execution.monitor import (
+        evaluate_exit,
+        exit_limit,
+        parse_occ,
+        reconstruct_spreads,
+    )
 
     cfg = Config()
     broker = Broker()
@@ -24,9 +34,11 @@ def run_monitor(dry_run: bool = True) -> None:
     )
 
     # Reconcile the trade journal against the broker's filled orders.
+    # This MUST run before reconstruct_spreads below: the exit decision
+    # prefers the journal's fill-derived entry credit, so the journal has to
+    # be fresh first. Keep this ordering.
     try:
         import requests as _rq
-        from agent import journal
         r = _rq.get(
             "https://paper-api.alpaca.markets/v2/orders",
             params={"status": "closed", "asset_class": "us_option", "limit": "500", "nested": "true"},
@@ -37,8 +49,20 @@ def run_monitor(dry_run: bool = True) -> None:
     except Exception:
         log.exception("journal reconcile failed — continuing")
 
+    # Fill-derived entry credits for open trades, keyed by leg pair.
+    credits: dict[tuple[str, str], float] = {}
+    try:
+        con = journal.connect()
+        for row in con.execute(
+            "SELECT short_symbol, long_symbol, entry_credit FROM trades WHERE status='open'"
+        ):
+            credits[(row["short_symbol"], row["long_symbol"])] = float(row["entry_credit"])
+        con.close()
+    except Exception:
+        log.exception("journal read failed — falling back to avg entry prices")
+
     positions = broker.option_positions()
-    spreads = reconstruct_spreads(positions)
+    spreads = reconstruct_spreads(positions, credits)
     log.info("monitor: %d option leg(s) -> %d spread(s)", len(positions), len(spreads))
     if not spreads:
         return
@@ -50,7 +74,13 @@ def run_monitor(dry_run: bool = True) -> None:
     open_orders = broker.open_option_orders()
     from agent.execution.stale import is_retry, select_stale, spread_legs
 
-    for o in select_stale(open_orders, cfg.strategy.order_stale_after_s):
+    # The stale pass cancels and REPRICES (= submits real orders). It must
+    # honor dry_run: preflight runs a dry monitor pass on every restart and
+    # must never touch the live order book.
+    stale = select_stale(open_orders, cfg.strategy.order_stale_after_s)
+    if dry_run and stale:
+        log.info("dry-run: %d stale order(s) left untouched", len(stale))
+    for o in stale if not dry_run else []:
         legs_for_name = spread_legs(o)
         stale_sym = parse_occ(legs_for_name[0]).root if legs_for_name else "?"
         try:
@@ -96,7 +126,8 @@ def run_monitor(dry_run: bool = True) -> None:
                         qty=int(float(o.qty)), natural=natural, status=order["status"])
         except Exception:
             log.exception("reprice failed for %s", o.id)
-    open_orders = [o for o in open_orders if o not in select_stale(open_orders, cfg.strategy.order_stale_after_s)]
+    if not dry_run:
+        open_orders = [o for o in open_orders if o not in stale]
 
     # Symbols with an open (pending) order are skipped to avoid duplicates.
     pending = set()
@@ -115,6 +146,8 @@ def run_monitor(dry_run: bool = True) -> None:
         q = quotes.get(symbol)
         if q is None or not q.bid_price or not q.ask_price:
             return None
+        if q.ask_price < q.bid_price:   # crossed quote — stale or bogus tick
+            return None
         return (q.bid_price + q.ask_price) / 2
 
     for sp in spreads:
@@ -127,12 +160,15 @@ def run_monitor(dry_run: bool = True) -> None:
             continue
         decision = evaluate_exit(sp, short_mid, long_mid, cfg.strategy)
         log.info("%s x%d: %s — %s", sp.underlying, sp.qty, decision.action, decision.reason)
+        if decision.flag and sp.underlying not in _flagged_unmanageable:
+            _flagged_unmanageable.add(sp.underlying)
+            events.emit("position_unmanageable", symbol=sp.underlying,
+                        credit=sp.entry_credit, reason=decision.reason)
         if decision.action == "CLOSE":
             events.emit("exit_signal", symbol=sp.underlying, reason=decision.reason,
                         cost=decision.cost_to_close, credit=sp.entry_credit, qty=sp.qty)
         if decision.action == "CLOSE" and not dry_run:
-            # Cross the spread a little to get filled on exits.
-            limit = round(decision.cost_to_close * 1.02 + 0.01, 2)
+            limit = exit_limit(decision.cost_to_close, sp.width, cfg.strategy)
             order = broker.close_credit_spread(
                 sp.short_symbol, sp.long_symbol, sp.qty, limit
             )

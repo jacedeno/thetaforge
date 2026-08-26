@@ -64,7 +64,8 @@ def run_scan(dry_run: bool = True) -> None:
         events.emit("signal", symbol=sig.symbol, direction="LONG", price=sig.close,
                     strength=round(sig.strength, 4))
         spread = build_put_credit_spread(
-            option_data, sig.symbol, sig.close, cfg.strategy, cfg.risk
+            option_data, sig.symbol, sig.close, cfg.strategy, cfg.risk,
+            oi_lookup=broker.option_open_interest,
         )
         if spread is None:
             log.info("  no spread passes chain/liquidity gates — skip")
@@ -94,7 +95,7 @@ def run_scan(dry_run: bool = True) -> None:
             log.info("  order %s status=%s", order["id"], order["status"])
             events.emit("order_open", symbol=spread.underlying,
                         short=spread.short_symbol, long=spread.long_symbol,
-                        qty=qty, credit=spread.credit_mid,
+                        qty=qty, credit=spread.credit_mid, entry_limit=entry_limit,
                         max_risk=round(spread.max_risk_per_spread * qty, 2),
                         delta=spread.short_delta, status=order["status"])
             held.add(spread.underlying)

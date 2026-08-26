@@ -11,6 +11,7 @@ Runs idempotently inside the monitor pass — safe to call every minute.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,7 +35,8 @@ CREATE TABLE IF NOT EXISTS trades (
     realized_pl     REAL,
     exit_reason     TEXT,
     signal_strength REAL,
-    status          TEXT NOT NULL DEFAULT 'open'   -- open | closed
+    status          TEXT NOT NULL DEFAULT 'open',  -- open | closed
+    source          TEXT NOT NULL DEFAULT 'agent'  -- agent | manual
 );
 """
 
@@ -45,10 +47,55 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     con = sqlite3.connect(p)
     con.row_factory = sqlite3.Row
     con.execute(_SCHEMA)
+    cols = {r[1] for r in con.execute("PRAGMA table_info(trades)")}
+    if "source" not in cols:
+        con.execute("ALTER TABLE trades ADD COLUMN source TEXT NOT NULL DEFAULT 'agent'")
     return con
 
 
 # ---- order pairing -------------------------------------------------------
+
+# Every client_order_id this codebase generates. Anything else on the tape —
+# hand-typed smoke tests included — is a manual order and must never be
+# counted as agent performance (learned 2026-08-26: tf-smoke-cli-001).
+_AGENT_ORDER_ID = re.compile(r"^tf-(open|retry)-")
+
+
+def order_source(order: dict) -> str:
+    cid = order.get("client_order_id") or ""
+    return "agent" if _AGENT_ORDER_ID.match(cid) else "manual"
+
+
+def _leg_fills(order: dict) -> tuple[float, float] | None:
+    """(sell fill, buy fill) when both legs carry filled_avg_price, else None."""
+    legs = order.get("legs") or []
+    sell = next((l for l in legs if l.get("side") == "sell"), None)
+    buy = next((l for l in legs if l.get("side") == "buy"), None)
+    if sell and buy and sell.get("filled_avg_price") and buy.get("filled_avg_price"):
+        return float(sell["filled_avg_price"]), float(buy["filled_avg_price"])
+    return None
+
+
+def net_credit(order: dict) -> float:
+    """Net price of a filled mleg order, always positive.
+
+    The single source of truth for entry/exit prices: prefer the per-leg
+    fills (what actually happened), fall back to the parent's
+    filled_avg_price, whose sign convention Alpaca leaves to the reader.
+    """
+    fills = _leg_fills(order)
+    if fills is not None:
+        return round(abs(fills[0] - fills[1]), 2)
+    return abs(float(order.get("filled_avg_price") or 0))
+
+
+def leg_parent_mismatch(order: dict) -> float | None:
+    """Divergence between leg-derived and parent-reported net price, if > 1c."""
+    fills = _leg_fills(order)
+    if fills is None:
+        return None
+    diff = round(abs(abs(fills[0] - fills[1]) - abs(float(order.get("filled_avg_price") or 0))), 2)
+    return diff if diff > 0.01 else None
 
 
 def _leg_intents(order: dict) -> set[str]:
@@ -89,7 +136,8 @@ def pair_round_trips(filled_orders: list[dict]) -> list[dict]:
                 "long_symbol": long_["symbol"],
                 "qty": int(float(o["qty"])),
                 "open_ts": o["filled_at"],
-                "entry_credit": abs(float(o["filled_avg_price"] or 0)),
+                "entry_credit": net_credit(o),
+                "source": order_source(o),
                 "close_ts": None, "exit_debit": None,
                 "realized_pl": None, "status": "open",
             })
@@ -97,7 +145,7 @@ def pair_round_trips(filled_orders: list[dict]) -> list[dict]:
             opened = opens[key].pop(0)
             trip = next(t for t in trips if t["open_order_id"] == opened["id"])
             trip["close_ts"] = o["filled_at"]
-            trip["exit_debit"] = abs(float(o["filled_avg_price"] or 0))
+            trip["exit_debit"] = net_credit(o)
             trip["realized_pl"] = round(
                 (trip["entry_credit"] - trip["exit_debit"]) * 100 * trip["qty"], 2
             )
@@ -132,6 +180,10 @@ def enrich(trip: dict, events: list[dict], underlying: str) -> dict:
 
 # ---- reconciler ----------------------------------------------------------
 
+# One journal_price_mismatch event per order per process — reconcile reruns
+# over the same tape every monitor pass.
+_mismatch_flagged: set[str] = set()
+
 
 def reconcile(raw_orders: list[dict], con: sqlite3.Connection | None = None) -> int:
     """Upsert round trips built from the broker's filled orders. Returns row count."""
@@ -139,6 +191,14 @@ def reconcile(raw_orders: list[dict], con: sqlite3.Connection | None = None) -> 
 
     con = con or connect()
     events = _load_events()
+    for o in raw_orders:
+        diff = leg_parent_mismatch(o)
+        oid = str(o.get("id"))
+        if diff is not None and oid not in _mismatch_flagged:
+            _mismatch_flagged.add(oid)
+            from agent import events as _ev
+            _ev.emit("journal_price_mismatch", order_id=oid,
+                     client_order_id=o.get("client_order_id"), divergence=diff)
     trips = pair_round_trips(raw_orders)
     for t in trips:
         occ = parse_occ(t["short_symbol"])
@@ -147,17 +207,20 @@ def reconcile(raw_orders: list[dict], con: sqlite3.Connection | None = None) -> 
         con.execute(
             """INSERT INTO trades (open_order_id, underlying, short_symbol, long_symbol,
                    short_strike, long_strike, expiration, qty, open_ts, close_ts,
-                   entry_credit, exit_debit, realized_pl, exit_reason, signal_strength, status)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   entry_credit, exit_debit, realized_pl, exit_reason, signal_strength,
+                   status, source)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(open_order_id) DO UPDATE SET
                    close_ts=excluded.close_ts, exit_debit=excluded.exit_debit,
+                   entry_credit=excluded.entry_credit,
                    realized_pl=excluded.realized_pl, exit_reason=excluded.exit_reason,
                    signal_strength=COALESCE(excluded.signal_strength, trades.signal_strength),
-                   status=excluded.status""",
+                   status=excluded.status, source=excluded.source""",
             (t["open_order_id"], occ.root, t["short_symbol"], t["long_symbol"],
              occ.strike, locc.strike, occ.expiration.isoformat(), t["qty"],
              t["open_ts"], t["close_ts"], t["entry_credit"], t["exit_debit"],
-             t["realized_pl"], t["exit_reason"], t["signal_strength"], t["status"]),
+             t["realized_pl"], t["exit_reason"], t["signal_strength"], t["status"],
+             t["source"]),
         )
     con.commit()
     return len(trips)

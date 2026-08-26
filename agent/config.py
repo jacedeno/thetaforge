@@ -25,6 +25,11 @@ class StrategyConfig:
     entry_concession_min: float = 0.01
     profit_target_pct: float = 0.50        # close at 50% of collected credit
     stop_loss_credit_mult: float = 2.0     # stop when loss reaches 2x credit
+    # Credit-relative thresholds collapse on tiny credits: at 0.03 the whole
+    # decision band is eight cents wide and quote flicker exits the trade.
+    # Both exit rules must sit at least this far from the entry credit.
+    min_exit_band_usd: float = 0.10
+    min_exit_limit_usd: float = 0.02       # floor for the pad on the closing limit
 
 
 @dataclass(frozen=True)
@@ -40,6 +45,10 @@ class RiskConfig:
     # cents alone rejects expensive ones where a normal ratio is many cents.
     max_bid_ask_width_pct: float = 0.25       # of mid, per leg
     max_bid_ask_width_usd: float = 0.10       # per leg, absolute alternative
+    # The absolute branch exists for cheap-but-real contracts; below this mid
+    # it would be rescuing penny dust whose "mid" is itself noise. Applied to
+    # the short leg only — the protective wing may be legitimately cheap.
+    min_mid_for_abs_width: float = 0.20
 
 
 @dataclass(frozen=True)

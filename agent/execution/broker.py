@@ -143,6 +143,25 @@ class Broker:
     def option_positions(self) -> list:
         return [p for p in self.trading.get_all_positions() if p.asset_class == "us_option"]
 
+    def option_open_interest(self, symbol: str) -> int | None:
+        """Latest open interest for one contract, or None when unknown.
+
+        OI lives in the trading API's contracts endpoint — the data API's
+        chain snapshots do not carry it.
+        """
+        try:
+            r = requests.get(
+                f"{PAPER_BASE}/v2/options/contracts/{symbol}",
+                headers=self._headers(), timeout=30,
+            )
+            if r.status_code >= 400:
+                return None
+            oi = r.json().get("open_interest")
+            return int(float(oi)) if oi not in (None, "") else None
+        except Exception:
+            log.warning("open-interest lookup failed for %s", symbol)
+            return None
+
     def open_option_orders(self) -> list:
         from alpaca.trading.requests import GetOrdersRequest
         from alpaca.trading.enums import QueryOrderStatus

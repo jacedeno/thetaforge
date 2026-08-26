@@ -1,15 +1,27 @@
-from agent.journal import pair_round_trips, is_opening, is_closing, connect, reconcile
+from agent.journal import (
+    connect,
+    is_closing,
+    is_opening,
+    net_credit,
+    order_source,
+    pair_round_trips,
+    reconcile,
+)
 
 
-def mk_order(oid, symbols, intents, filled_at, avg_price, qty="5"):
+def mk_order(oid, symbols, intents, filled_at, avg_price, qty="5", leg_prices=None,
+             client_order_id=None):
     return {
         "id": oid,
         "qty": qty,
         "filled_at": filled_at,
         "filled_avg_price": avg_price,
+        "client_order_id": client_order_id,
         "legs": [
-            {"symbol": s, "side": "sell" if i.startswith("sell") else "buy", "position_intent": i}
-            for s, i in zip(symbols, intents)
+            {"symbol": s, "side": "sell" if i.startswith("sell") else "buy",
+             "position_intent": i,
+             **({"filled_avg_price": p} if leg_prices else {})}
+            for (s, i), p in zip(zip(symbols, intents), leg_prices or [None] * len(symbols))
         ],
     }
 
@@ -53,6 +65,50 @@ def test_fifo_multiple_rounds():
     ]
     trips = pair_round_trips(orders)
     assert [t["status"] for t in trips] == ["closed", "open"]
+
+
+def test_net_credit_prefers_leg_fills():
+    """The 2026-08-26 smoke test: legs 0.37/0.34, parent -0.03 -> 0.03 either way,
+    but when they disagree the legs (what actually happened) win."""
+    o = mk_order("a", [SHORT, LONG], ["sell_to_open", "buy_to_open"],
+                 "2026-08-26T15:27:12Z", "-0.05", leg_prices=["0.37", "0.34"])
+    assert net_credit(o) == 0.03
+
+
+def test_net_credit_fallback_parent():
+    o = mk_order("a", [SHORT, LONG], ["sell_to_open", "buy_to_open"],
+                 "2026-08-25T14:00:00Z", "-1.13")
+    assert net_credit(o) == 1.13
+
+
+def test_monitor_and_journal_agree_on_entry_credit():
+    """One definition: reconstruct_spreads fed the journal credit must match
+    the journal's own fill-derived value exactly."""
+    from types import SimpleNamespace
+
+    from agent.execution.monitor import reconstruct_spreads
+
+    o = mk_order("a", [SHORT, LONG], ["sell_to_open", "buy_to_open"],
+                 "2026-08-25T14:00:00Z", "-1.13", leg_prices=["3.50", "2.37"])
+    credit = net_credit(o)
+    positions = [
+        SimpleNamespace(symbol=SHORT, qty="-5", avg_entry_price="3.50"),
+        SimpleNamespace(symbol=LONG, qty="5", avg_entry_price="2.37"),
+    ]
+    s = reconstruct_spreads(positions, {(SHORT, LONG): credit})[0]
+    assert s.entry_credit == credit == 1.13
+    assert s.credit_source == "journal"
+
+
+def test_source_manual_when_id_not_agent():
+    smoke = mk_order("a", [SHORT, LONG], ["sell_to_open", "buy_to_open"],
+                     "2026-08-26T15:27:12Z", "-0.03", client_order_id="tf-smoke-cli-001")
+    agent = mk_order("b", [SHORT, LONG], ["sell_to_open", "buy_to_open"],
+                     "2026-08-26T15:27:12Z", "-1.13", client_order_id="tf-open-NVDA-ab12cd34")
+    assert order_source(smoke) == "manual"
+    assert order_source(agent) == "agent"
+    trips = pair_round_trips([smoke, agent])
+    assert [t["source"] for t in trips] == ["manual", "agent"]
 
 
 def test_reconcile_upsert_idempotent(tmp_path):
