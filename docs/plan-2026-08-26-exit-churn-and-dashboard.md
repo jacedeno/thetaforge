@@ -1,10 +1,16 @@
 # Plan — fix churn exits, entry-gate leaks, and three dashboard defects
 
-> **Status: PROPOSED — nothing here has been implemented.** This document was
-> written on a machine that only holds a fresh clone (no `.env`, no
-> `data/thetaforge.db`, no `logs/events.jsonl`, no running agent). It exists so
-> the plan can be reviewed and executed from the machine where the agent
-> actually runs. Do not treat any statement below as "done".
+> **Status: EXECUTED 2026-08-26, with corrections.** The step-1 diagnostic
+> resolved the incident on the live host: the SPY 700/695 trade was a manual
+> CLI smoke test (`client_order_id = tf-smoke-cli-001`, submitted 46 s before
+> commit `213f1ac`), not an agent decision. Findings B and C are therefore
+> void *as causes of this incident* — the parent and leg fills agree (0.03),
+> the fill beat its −0.01 limit legally, and the selector never ran on those
+> strikes. The code defects described below were verified real and fixed:
+> steps 1–3 and 5–8 in full; step 4 scoped to the verified bugs (crossed
+> quotes, open interest, penny-rescue branch, entry_limit emission), with the
+> delta-vs-price cross-check and short-leg bid floor deliberately deferred.
+> Incident record and the new no-manual-orders rule: `docs/OPERATIONS.md`.
 
 ## Context
 

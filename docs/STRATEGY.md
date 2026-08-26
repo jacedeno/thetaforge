@@ -23,8 +23,14 @@ Two edges, stacked:
 
 ## Entry rules
 
-- Universe: liquid S&P 500 names, 5-minute bars (the V1-5m live-validated variant) with options chains passing liquidity gates
-  (open interest ≥ 500/leg, bid-ask ≤ 10% of mid).
+- Universe: liquid S&P 500 names, 5-minute bars (the V1-5m live-validated variant) with options chains passing liquidity gates:
+  - **open interest ≥ 500 per leg**, verified against the contracts endpoint at
+    selection time — unknown OI rejects, never passes by default;
+  - **bid-ask ≤ 25% of mid**, or ≤ $0.10 absolute for cheap-but-real contracts
+    (the absolute branch requires a short-leg mid ≥ $0.20, so it can't rescue
+    penny dust);
+  - **crossed quotes (ask < bid) are rejected outright** — a bogus tick must
+    never price a trade.
 - Expiry: 7–21 DTE at entry.
 - Spread width: $5 (adjust per underlying price).
 - One position per underlying; max 10 open positions.
@@ -38,8 +44,21 @@ Two edges, stacked:
 
 - **Profit target:** buy back at 50% of collected credit.
 - **Stop:** close when loss reaches 2× collected credit.
+- **Absolute floor** (`min_exit_band_usd`, $0.10): both thresholds above must
+  sit at least $0.10 away from the entry credit — on a penny credit the
+  relative band is narrower than ordinary quote flicker. A credit so small
+  that no floored profitable exit exists is **held to the time stop** and
+  surfaced as `position_unmanageable`: closing it would mean paying roughly
+  the position's whole value in spread crossing, while the risk is already
+  defined and collateralized.
 - **Time stop:** close or roll at 2 DTE — never carry into expiration/assignment.
 - **Signal flip:** an opposing ML30 signal on the underlying closes the position.
+- **No minimum holding time — deliberately.** Same-session closes are correct
+  and intended (see the PDT note above); the floors are absolute price bands,
+  not time locks. Do not "fix" exit churn with a hold timer — it would also
+  delay legitimate stops.
+- Closing limits carry a $0.02 minimum pad and are capped at the spread's
+  width — no rational close pays more than the spread can ever be worth.
 
 ## Execution architecture (Alpaca stack)
 
