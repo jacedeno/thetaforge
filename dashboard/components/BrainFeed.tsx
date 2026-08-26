@@ -20,18 +20,48 @@ const COLORS: Record<string, string> = {
   order_reprice_skipped: "var(--ink-muted)",
 };
 
+function friendlyVeto(reason: string): string {
+  if (reason.includes("chain/liquidity")) return "its options chain isn't liquid enough to trade well";
+  if (reason.includes("budget")) return "one spread would exceed the per-position risk budget";
+  if (reason.includes("already holding")) return "we already hold a position there";
+  if (reason.includes("max open")) return "the portfolio is at its position limit";
+  if (reason.includes("buying power")) return "not enough option buying power right now";
+  return reason;
+}
+
+function friendlyExit(reason: string): string {
+  if (reason.includes("profit target")) return "profit target reached — locking in the win early";
+  if (reason.includes("stop loss")) return "stop hit — cutting the loss before it grows";
+  if (reason.includes("time stop")) return "too close to expiration — never carry into the last days";
+  return reason;
+}
+
 function line(e: Ev): string {
   switch (e.type) {
-    case "scan": return `scan complete — ${e.signals} signal(s) across ${e.universe} symbols`;
-    case "signal": return `signal ${e.symbol} ${e.direction} @ ${e.price} · strength ${e.strength}`;
-    case "veto": return `veto ${e.symbol} — ${e.reason}`;
-    case "order_open": return `OPEN ${e.symbol} credit spread x${e.qty} @ $${e.credit} credit · max risk $${e.max_risk} · Δ${e.delta}`;
-    case "exit_signal": return `exit ${e.symbol} — ${e.reason}`;
-    case "order_close": return `CLOSE ${e.symbol} x${e.qty} @ $${e.limit} — ${e.reason}`;
-    case "order_stale": return `entry unfilled for ${e.age_s}s — cancelled`;
-    case "order_reprice": return `REPRICE at natural $${e.natural} x${e.qty} — trading price for certainty`;
-    case "order_reprice_skipped": return `reprice skipped — ${e.reason}`;
-    default: return JSON.stringify(e);
+    case "scan":
+      return e.signals === 0
+        ? `scanned ${e.universe} symbols on the 15-min close — no fresh momentum triggers`
+        : `scanned ${e.universe} symbols — ${e.signals} momentum trigger${Number(e.signals) > 1 ? "s" : ""} found`;
+    case "signal":
+      return `${e.symbol} just crossed above its trend at $${e.price} — a candidate`;
+    case "veto":
+      return `passed on ${e.symbol}: ${friendlyVeto(String(e.reason ?? ""))}`;
+    case "order_open":
+      return `selling a ${e.symbol} put spread ×${e.qty} for $${e.credit} credit — max loss capped at $${e.max_risk}, ~${Math.round(Number(e.delta ?? 0) * 100)}% chance it's ever tested`;
+    case "order_stale":
+      return e.retry
+        ? `${e.symbol ?? "order"}: even the market's own price didn't fill in ${Math.round(Number(e.age_s) / 60)} min — letting this one go`
+        : `${e.symbol ?? "order"}: our price sat unfilled for ${Math.round(Number(e.age_s) / 60)} min — pulling it`;
+    case "order_reprice":
+      return `retrying ${e.symbol ?? e.short} at the market's price ($${e.natural}) — a filled trade beats a perfect price`;
+    case "order_reprice_skipped":
+      return `no retry for ${e.symbol ?? e.short}: ${String(e.reason ?? "").includes("already exists") ? "an earlier fill already covered it" : "the market's price no longer pays enough"}`;
+    case "exit_signal":
+      return `${e.symbol}: ${friendlyExit(String(e.reason ?? ""))}`;
+    case "order_close":
+      return `buying back ${e.symbol} ×${e.qty} at $${e.limit} — ${friendlyExit(String(e.reason ?? ""))}`;
+    default:
+      return JSON.stringify(e);
   }
 }
 

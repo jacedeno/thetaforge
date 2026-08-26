@@ -51,10 +51,12 @@ def run_monitor(dry_run: bool = True) -> None:
     from agent.execution.stale import is_retry, select_stale, spread_legs
 
     for o in select_stale(open_orders, cfg.strategy.order_stale_after_s):
+        legs_for_name = spread_legs(o)
+        stale_sym = parse_occ(legs_for_name[0]).root if legs_for_name else "?"
         try:
             broker.cancel_order(str(o.id))
-            log.info("cancelled stale entry order %s", o.id)
-            events.emit("order_stale", order_id=str(o.id),
+            log.info("cancelled stale entry order %s (%s)", o.id, stale_sym)
+            events.emit("order_stale", symbol=stale_sym, retry=is_retry(o),
                         age_s=int(cfg.strategy.order_stale_after_s))
         except Exception:
             log.exception("could not cancel stale order %s", o.id)
@@ -68,7 +70,7 @@ def run_monitor(dry_run: bool = True) -> None:
         # satisfied — a reprice here would double the position.
         underlying = parse_occ(legs[0]).root
         if any(parse_occ(p.symbol).root == underlying for p in broker.option_positions()):
-            events.emit("order_reprice_skipped", short=legs[0],
+            events.emit("order_reprice_skipped", symbol=underlying, short=legs[0],
                         reason="position already exists in underlying")
             continue
         try:
@@ -90,7 +92,7 @@ def run_monitor(dry_run: bool = True) -> None:
                 legs[0], legs[1], int(float(o.qty)), natural,
                 client_order_id=f"tf-retry-{_uuid.uuid4().hex[:8]}")
             log.info("repriced stale entry at natural %.2f -> order %s", natural, order["id"])
-            events.emit("order_reprice", short=legs[0], long=legs[1],
+            events.emit("order_reprice", symbol=underlying, short=legs[0], long=legs[1],
                         qty=int(float(o.qty)), natural=natural, status=order["status"])
         except Exception:
             log.exception("reprice failed for %s", o.id)
