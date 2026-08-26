@@ -20,9 +20,12 @@ export async function GET() {
 
   const ts = heartbeat?.ts ? new Date(heartbeat.ts as string).getTime() : 0;
   const ageS = (Date.now() - ts) / 1000;
+  const failures = Number(heartbeat?.consecutive_failures ?? 0);
   return NextResponse.json({
     agent: {
       alive: ageS < 360,           // loop beats at least every ~5min when closed, 1min when open
+      degraded: failures >= 3,     // beating, but its passes keep crashing
+      consecutiveFailures: failures,
       lastBeat: heartbeat?.ts ?? null,
       lastScan: heartbeat?.last_scan ?? null,
       started: heartbeat?.started ?? null,

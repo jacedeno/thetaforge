@@ -50,13 +50,15 @@ def run_loop(dry_run: bool) -> None:
     last_scan_ts: str | None = None
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     iteration = 0
+    consecutive_failures = 0
     log.info("loop started (dry_run=%s)", dry_run)
     while True:
         try:
             iteration += 1
             open_now = market_is_open(broker)
             beat(market_open=open_now, last_scan=last_scan_ts, started=started,
-                 iteration=iteration, dry_run=dry_run)
+                 iteration=iteration, dry_run=dry_run,
+                 consecutive_failures=consecutive_failures)
             if open_now:
                 now = datetime.now(timezone.utc)
                 slot = f"{now.hour}:{now.minute // 15}"   # changes at each 15m boundary
@@ -73,8 +75,11 @@ def run_loop(dry_run: bool) -> None:
             else:
                 log.info("market closed — sleeping 5m")
                 time.sleep(240)
+            consecutive_failures = 0
         except Exception:
-            log.exception("loop iteration failed — continuing")
+            consecutive_failures += 1
+            log.exception("loop iteration failed (%d in a row) — continuing",
+                          consecutive_failures)
         time.sleep(MONITOR_INTERVAL_S)
 
 

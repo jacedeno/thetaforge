@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 
 interface Health {
   agent: {
-    alive: boolean; lastBeat: string | null; lastScan: string | null;
+    alive: boolean; degraded?: boolean; consecutiveFailures?: number;
+    lastBeat: string | null; lastScan: string | null;
     started: string | null; iteration: number | null; marketOpen: boolean | null;
   };
   eventsToday: number;
@@ -36,6 +37,10 @@ export default function StatusStrip({ marketOpen, countdown }: { marketOpen: boo
   }, []);
 
   const alive = health?.agent.alive ?? false;
+  const degraded = health?.agent.degraded ?? false;
+  const stateColor = !alive ? "var(--critical)" : degraded ? "var(--series-2)" : "var(--good)";
+  const stateLabel = !alive ? "AGENT DOWN"
+    : degraded ? `AGENT DEGRADED (${health?.agent.consecutiveFailures} failed passes)` : "AGENT LIVE";
 
   const Item = ({ label, value, tone }: { label: string; value: React.ReactNode; tone?: string }) => (
     <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -48,10 +53,10 @@ export default function StatusStrip({ marketOpen, countdown }: { marketOpen: boo
     <div className="font-mono2 flex items-center gap-5 overflow-x-auto border-b px-6 py-2 text-[12px]"
       style={{ borderColor: "var(--grid)", background: "var(--surface-1)" }}>
       <span className="flex items-center gap-2 whitespace-nowrap font-medium"
-        style={{ color: alive ? "var(--good)" : "var(--critical)" }}>
-        <span className={`inline-block h-2 w-2 rounded-full ${alive ? "live-dot" : ""}`}
-          style={{ background: alive ? "var(--good)" : "var(--critical)" }} />
-        {alive ? "AGENT LIVE" : "AGENT DOWN"}
+        style={{ color: stateColor }}>
+        <span className={`inline-block h-2 w-2 rounded-full ${alive && !degraded ? "live-dot" : ""}`}
+          style={{ background: stateColor }} />
+        {stateLabel}
       </span>
       <Item label="market" value={marketOpen ? "OPEN" : "CLOSED"}
         tone={marketOpen ? "var(--good)" : undefined} />
