@@ -20,6 +20,18 @@ def test_entry_vs_exit_detection():
     assert not is_entry(order(["buy_to_close", "sell_to_close"]))
 
 
+def test_entry_detection_with_sdk_enums():
+    """The SDK sends enums whose str() is 'PositionIntent.SELL_TO_OPEN'."""
+    from alpaca.trading.enums import PositionIntent
+
+    o = order([PositionIntent.SELL_TO_OPEN, PositionIntent.BUY_TO_OPEN])
+    assert is_entry(o)
+    c = order([PositionIntent.BUY_TO_CLOSE, PositionIntent.SELL_TO_CLOSE])
+    assert not is_entry(c)
+    assert len(select_stale([o], 180, NOW)) == 1
+    assert select_stale([c], 180, NOW) == []
+
+
 def test_age_seconds():
     assert age_seconds(order(["sell_to_open", "buy_to_open"], minutes_old=5), NOW) == 300
 

@@ -14,11 +14,21 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 
+def _intent(leg) -> str:
+    """Intent as a plain lowercase string.
+
+    The SDK returns an enum whose str() is "PositionIntent.SELL_TO_OPEN" —
+    matching on the raw string silently fails, so normalize via .value first.
+    """
+    raw = getattr(leg, "position_intent", "")
+    return str(getattr(raw, "value", raw)).lower()
+
+
 def is_entry(order) -> bool:
     """True when every leg opens a position."""
     legs = getattr(order, "legs", None) or []
-    intents = {str(getattr(leg, "position_intent", "")) for leg in legs}
-    return bool(intents) and all("to_open" in i for i in intents)
+    intents = {_intent(leg) for leg in legs}
+    return bool(intents) and all(i.endswith("to_open") for i in intents)
 
 
 def age_seconds(order, now: datetime | None = None) -> float:

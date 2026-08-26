@@ -66,8 +66,13 @@ def run_scan(dry_run: bool = True) -> None:
             spread.credit_mid, spread.max_risk_per_spread * qty,
         )
         opened_this_scan += 1
+        # An order at the exact mid queues behind the market and mostly sits
+        # unfilled; a small concession trades pennies for a filled position.
+        concession = max(cfg.strategy.entry_concession_min,
+                         round(spread.credit_mid * cfg.strategy.entry_concession_pct, 2))
+        entry_limit = round(spread.credit_mid - concession, 2)
         if not dry_run:
-            order = broker.open_credit_spread(spread, qty, spread.credit_mid)
+            order = broker.open_credit_spread(spread, qty, entry_limit)
             log.info("  order %s status=%s", order["id"], order["status"])
             events.emit("order_open", symbol=spread.underlying,
                         short=spread.short_symbol, long=spread.long_symbol,
