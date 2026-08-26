@@ -5,7 +5,6 @@ import * as echarts from "echarts/core";
 import { BarChart } from "echarts/charts";
 import { GridComponent, TooltipComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
-import type { Trade } from "./TradeHistory";
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -16,21 +15,15 @@ function token(name: string): string {
 export default function DailyPnl() {
   const ref = useRef<HTMLDivElement>(null);
   const chart = useRef<echarts.ECharts | null>(null);
-  const [days, setDays] = useState<[string, number][]>([]);
+  const [days, setDays] = useState<{ date: string; pl: number; live: boolean }[]>([]);
 
   useEffect(() => {
     const load = () =>
-      fetch("/api/trades").then((r) => r.json()).then((j) => {
-        const byDay = new Map<string, number>();
-        for (const t of (j.trades ?? []) as Trade[]) {
-          if (t.status !== "closed" || !t.close_ts) continue;
-          const d = t.close_ts.slice(0, 10);
-          byDay.set(d, (byDay.get(d) ?? 0) + (t.realized_pl ?? 0));
-        }
-        setDays([...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-10));
-      }).catch(() => {});
+      fetch("/api/daily-pnl").then((r) => r.json())
+        .then((j) => setDays(j.days ?? []))
+        .catch(() => {});
     load();
-    const t = setInterval(load, 60_000);
+    const t = setInterval(load, 20_000);
     return () => clearInterval(t);
   }, []);
 
@@ -55,7 +48,9 @@ export default function DailyPnl() {
       },
       xAxis: {
         type: "category",
-        data: days.map(([d]) => new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short" })),
+        data: days.map((d) =>
+          d.live ? "today · live"
+                 : new Date(d.date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short" })),
         axisLine: { lineStyle: { color: token("--baseline") } },
         axisLabel: { color: token("--ink-muted"), fontSize: 11 },
       },
@@ -65,11 +60,12 @@ export default function DailyPnl() {
         axisLabel: { color: token("--ink-muted"), fontSize: 11, formatter: (v: number) => "$" + v },
       },
       series: [{
-        type: "bar", data: days.map(([, v]) => ({
-          value: Math.round(v * 100) / 100,
+        type: "bar", data: days.map((d) => ({
+          value: Math.round(d.pl * 100) / 100,
           itemStyle: {
-            color: v >= 0 ? token("--good") : token("--critical"),
-            borderRadius: v >= 0 ? [4, 4, 0, 0] : [0, 0, 4, 4],
+            color: d.pl >= 0 ? token("--good") : token("--critical"),
+            borderRadius: d.pl >= 0 ? [4, 4, 0, 0] : [0, 0, 4, 4],
+            opacity: d.live ? 0.65 : 1,   // floating, still moving
           },
         })),
         barMaxWidth: 24,
@@ -80,7 +76,12 @@ export default function DailyPnl() {
   if (days.length === 0) return null;
   return (
     <section className="card mb-6 p-5">
-      <h2 className="font-display mb-3 text-base font-semibold">Daily P&L</h2>
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="font-display text-base font-semibold">Daily P&L</h2>
+        <span className="text-xs" style={{ color: "var(--ink-muted)" }}>
+          today updates live — the lighter bar is still in motion
+        </span>
+      </div>
       <div ref={ref} className="h-48 w-full" />
     </section>
   );
