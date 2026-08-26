@@ -1,14 +1,21 @@
-"""Order execution against Alpaca's paper trading API.
+"""Order execution against Alpaca's paper trading environment.
 
-Multi-leg orders go through the raw REST endpoint: the documented mleg
-semantics (negative limit = net credit, per-leg position intents) were
-validated by hand on 2026-08-24 — see docs/alpaca-notes.md.
-Account and position reads use alpaca-py's TradingClient.
+Execution routes through the **Alpaca CLI** (`alpaca order submit/cancel`
+with structured JSON output) — the tool Alpaca built for long-running agent
+sessions. The raw REST endpoint stays as an automatic fallback so a CLI
+hiccup never blocks a trade, and alpaca-py's TradingClient handles account
+and position reads. The documented mleg semantics (negative limit = net
+credit, per-leg position intents) were validated live on 2026-08-24/26 —
+see docs/alpaca-notes.md.
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import os
+import shutil
+import subprocess
 import uuid
 
 import requests
@@ -17,6 +24,29 @@ from alpaca.trading.client import TradingClient
 from agent.options.selector import SpreadCandidate
 
 PAPER_BASE = "https://paper-api.alpaca.markets"
+
+log = logging.getLogger("thetaforge")
+
+
+def cli_path() -> str | None:
+    return shutil.which("alpaca") or (
+        os.path.expanduser("~/go/bin/alpaca")
+        if os.path.exists(os.path.expanduser("~/go/bin/alpaca")) else None
+    )
+
+
+def mleg_submit_args(legs: list[dict], qty: int, limit_price: float, client_order_id: str) -> list[str]:
+    """CLI argv for a multi-leg limit order (pure, for tests)."""
+    return [
+        "order", "submit",
+        "--order-class", "mleg",
+        "--qty", str(qty),
+        "--type", "limit",
+        "--limit-price", str(round(limit_price, 2)),
+        "--time-in-force", "day",
+        "--client-order-id", client_order_id,
+        "--legs", json.dumps(legs),
+    ]
 
 
 class Broker:
@@ -40,6 +70,32 @@ class Broker:
             raise RuntimeError(f"order rejected [{r.status_code}]: {r.text}")
         return r.json()
 
+    # -- Alpaca CLI (primary execution path) ------------------------------
+
+    def _cli(self, args: list[str]) -> dict:
+        """Run one Alpaca CLI command and parse its JSON output."""
+        binary = cli_path()
+        if binary is None:
+            raise RuntimeError("alpaca CLI not installed")
+        env = {**os.environ, "ALPACA_API_KEY": self._key, "ALPACA_SECRET_KEY": self._secret}
+        r = subprocess.run([binary, *args], capture_output=True, text=True, timeout=30, env=env)
+        if r.returncode != 0:
+            raise RuntimeError(f"alpaca CLI failed [{r.returncode}]: {r.stderr.strip()[:300]}")
+        out = r.stdout.strip()
+        return json.loads(out) if out else {}
+
+    def _submit_spread(self, legs: list[dict], qty: int, limit_price: float, client_order_id: str) -> dict:
+        """CLI first; REST fallback so execution never depends on one path."""
+        try:
+            return self._cli(mleg_submit_args(legs, qty, limit_price, client_order_id))
+        except Exception as e:
+            log.warning("CLI submit failed (%s) — falling back to REST", e)
+            return self._post_order({
+                "order_class": "mleg", "qty": str(qty), "type": "limit",
+                "limit_price": str(round(limit_price, 2)), "time_in_force": "day",
+                "client_order_id": client_order_id, "legs": legs,
+            })
+
     # -- spreads ----------------------------------------------------------
 
     def open_credit_spread(self, spread: SpreadCandidate, qty: int, limit_credit: float) -> dict:
@@ -53,49 +109,28 @@ class Broker:
         self, short_symbol: str, long_symbol: str, qty: int,
         limit_credit: float, client_order_id: str | None = None,
     ) -> dict:
-        payload = {
-            "order_class": "mleg",
-            "qty": str(qty),
-            "type": "limit",
-            "limit_price": str(-abs(round(limit_credit, 2))),  # negative = credit
-            "time_in_force": "day",
-            "client_order_id": client_order_id or f"tf-open-{uuid.uuid4().hex[:8]}",
-            "legs": [
-                {"symbol": short_symbol, "ratio_qty": "1",
-                 "side": "sell", "position_intent": "sell_to_open"},
-                {"symbol": long_symbol, "ratio_qty": "1",
-                 "side": "buy", "position_intent": "buy_to_open"},
-            ],
-        }
-        return self._post_order(payload)
+        legs = [
+            {"symbol": short_symbol, "ratio_qty": "1",
+             "side": "sell", "position_intent": "sell_to_open"},
+            {"symbol": long_symbol, "ratio_qty": "1",
+             "side": "buy", "position_intent": "buy_to_open"},
+        ]
+        return self._submit_spread(
+            legs, qty, -abs(limit_credit),
+            client_order_id or f"tf-open-{uuid.uuid4().hex[:8]}")
 
     def close_credit_spread(
         self, short_symbol: str, long_symbol: str, qty: int, limit_debit: float
     ) -> dict:
         """Buy-to-close a credit spread at a net debit limit (positive input)."""
-        payload = {
-            "order_class": "mleg",
-            "qty": str(qty),
-            "type": "limit",
-            "limit_price": str(abs(round(limit_debit, 2))),  # positive = debit
-            "time_in_force": "day",
-            "client_order_id": f"tf-close-{uuid.uuid4().hex[:8]}",
-            "legs": [
-                {
-                    "symbol": short_symbol,
-                    "ratio_qty": "1",
-                    "side": "buy",
-                    "position_intent": "buy_to_close",
-                },
-                {
-                    "symbol": long_symbol,
-                    "ratio_qty": "1",
-                    "side": "sell",
-                    "position_intent": "sell_to_close",
-                },
-            ],
-        }
-        return self._post_order(payload)
+        legs = [
+            {"symbol": short_symbol, "ratio_qty": "1",
+             "side": "buy", "position_intent": "buy_to_close"},
+            {"symbol": long_symbol, "ratio_qty": "1",
+             "side": "sell", "position_intent": "sell_to_close"},
+        ]
+        return self._submit_spread(
+            legs, qty, abs(limit_debit), f"tf-close-{uuid.uuid4().hex[:8]}")
 
     # -- account state ----------------------------------------------------
 
@@ -115,4 +150,8 @@ class Broker:
         return self.trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN))
 
     def cancel_order(self, order_id: str) -> None:
-        self.trading.cancel_order_by_id(order_id)
+        try:
+            self._cli(["order", "cancel", "--order-id", order_id])
+        except Exception as e:
+            log.warning("CLI cancel failed (%s) — falling back to SDK", e)
+            self.trading.cancel_order_by_id(order_id)

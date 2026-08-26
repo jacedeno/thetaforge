@@ -54,3 +54,15 @@ def test_exit_order_never_cancelled():
 def test_partially_filled_entry_kept():
     partial = order(["sell_to_open", "buy_to_open"], filled="1", minutes_old=30)
     assert select_stale([partial], 180, NOW) == []
+
+
+def test_mleg_submit_args_shape():
+    from agent.execution.broker import mleg_submit_args
+    import json as _json
+
+    legs = [{"symbol": "S", "ratio_qty": "1", "side": "sell", "position_intent": "sell_to_open"}]
+    args = mleg_submit_args(legs, 5, -0.63, "tf-open-x")
+    assert args[:2] == ["order", "submit"]
+    assert "--order-class" in args and args[args.index("--order-class") + 1] == "mleg"
+    assert args[args.index("--limit-price") + 1] == "-0.63"
+    assert _json.loads(args[args.index("--legs") + 1]) == legs

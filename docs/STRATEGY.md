@@ -41,6 +41,18 @@ Two edges, stacked:
 - **Time stop:** close or roll at 2 DTE — never carry into expiration/assignment.
 - **Signal flip:** an opposing ML30 signal on the underlying closes the position.
 
+## Execution architecture (Alpaca stack)
+
+- **Alpaca CLI** is the agent's execution layer: entries, reprices, exits and
+  cancels run through `alpaca order submit/cancel` with structured JSON output
+  and idempotent client order ids — the tool Alpaca built for long-running
+  agent sessions. Raw REST is an automatic fallback so a CLI hiccup never
+  blocks a trade.
+- **alpaca-py SDK / Market Data API** feeds signals, chains and quotes.
+- **Alpaca MCP server** is the supervision layer: the AI operator inspects
+  accounts, orders and chains through it during development and live runs.
+- Everything runs against the **paper trading environment**.
+
 ## Order handling
 
 Entries are limit orders priced at the spread's mid. A limit that sits unfilled
