@@ -95,6 +95,20 @@ signal symbols and OCC roots — `held` sets, duplicate gates) must map
 dotted tickers to their OCC root (`BRK.B` → `BRKB`), with a regression
 test. BRK.B returns to the universe only after that lands.
 
+**The agent's bars are SIP, delayed 15 minutes.** Caught auditing the AAPL
+entry (2026-08-27): the signal `bar_time` runs consistently 15–16 min
+behind the scan, and the signal bar's close (310.59) exists only on the
+SIP feed — the free plan serves full SIP history minus the most recent
+15 minutes. Consequences to review after the close: (a) every "5-minute"
+signal actually fires 15–20 min after its bar — decide between paying for
+real-time SIP, switching the signal feed to real-time IEX (thin bars), or
+accepting the delay as part of the system; (b) the first scans of the day
+evaluate PRE-MARKET bars (AAPL's trigger bar was 8:25 CT) — decide whether
+the trigger should be restricted to regular-hours bars. The dashboard now
+charts the same SIP feed (`ALPACA_DATA_FEED=sip` in `dashboard/.env.local`)
+so the drawn SMAs reproduce the agent's numbers exactly — auditing the
+agent on IEX charts was comparing two different markets.
+
 The stale-order reprice re-enters at the natural price **without
 re-validating the signal's age** — it checks only the credit floor and
 duplicate positions. Under a healthy monitor the stale→reprice chain lasts
