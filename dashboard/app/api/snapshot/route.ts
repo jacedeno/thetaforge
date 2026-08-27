@@ -8,16 +8,21 @@ import { alpaca, parseOcc } from "@/lib/alpaca";
  *  avg_entry_price derivation below is only the fallback (it averages
  *  across multiple fills on the same legs, which the 2026-08-26 doubled
  *  HD position showed drifting 4c from the surviving trade's real fill). */
-function journalCredits(): Map<string, number> {
+interface JournalOpen { entryCredit: number; openTs: string }
+
+function journalOpenTrades(): Map<string, JournalOpen> {
   try {
     const db = new Database(path.join(process.cwd(), "..", "data", "thetaforge.db"), {
       readonly: true, fileMustExist: true,
     });
     const rows = db.prepare(
-      "SELECT short_symbol, long_symbol, entry_credit FROM trades WHERE status = 'open'",
-    ).all() as { short_symbol: string; long_symbol: string; entry_credit: number }[];
+      "SELECT short_symbol, long_symbol, entry_credit, open_ts FROM trades WHERE status = 'open' ORDER BY open_ts",
+    ).all() as { short_symbol: string; long_symbol: string; entry_credit: number; open_ts: string }[];
     db.close();
-    return new Map(rows.map((r) => [`${r.short_symbol}|${r.long_symbol}`, r.entry_credit]));
+    return new Map(rows.map((r) => [
+      `${r.short_symbol}|${r.long_symbol}`,
+      { entryCredit: r.entry_credit, openTs: r.open_ts },
+    ]));
   } catch {
     return new Map();
   }
@@ -81,6 +86,7 @@ interface Spread {
   expiration: string;
   qty: number;
   entryCredit: number;
+  openTs: string | null;     // from the journal — the broker position has no timestamp
   currentCost: number;
   unrealizedPl: number;      // broker mark — can lag the live quote in thin chains
   midCost: number | null;    // cost to close at the mid — where you'd actually trade
@@ -88,7 +94,7 @@ interface Spread {
   dte: number;
 }
 
-function reconstructSpreads(positions: RawPosition[], credits: Map<string, number>): Spread[] {
+function reconstructSpreads(positions: RawPosition[], journal: Map<string, JournalOpen>): Spread[] {
   const shorts = new Map<string, RawPosition>();
   const longs = new Map<string, RawPosition>();
   for (const p of positions) {
@@ -105,9 +111,9 @@ function reconstructSpreads(positions: RawPosition[], credits: Map<string, numbe
     const sc = parseOcc(sp.symbol)!;
     const lc = parseOcc(lp.symbol)!;
     const qty = Math.abs(parseFloat(sp.qty));
+    const j = journal.get(`${sp.symbol}|${lp.symbol}`);
     const entryCredit =
-      credits.get(`${sp.symbol}|${lp.symbol}`) ??
-      parseFloat(sp.avg_entry_price) - parseFloat(lp.avg_entry_price);
+      j?.entryCredit ?? parseFloat(sp.avg_entry_price) - parseFloat(lp.avg_entry_price);
     const currentCost = parseFloat(sp.current_price) - parseFloat(lp.current_price);
     const dte = Math.round(
       (new Date(sc.expiration + "T21:00:00Z").getTime() - today.getTime()) / 86_400_000,
@@ -121,6 +127,7 @@ function reconstructSpreads(positions: RawPosition[], credits: Map<string, numbe
       expiration: sc.expiration,
       qty,
       entryCredit: +entryCredit.toFixed(2),
+      openTs: j?.openTs ?? null,
       currentCost: +currentCost.toFixed(2),
       unrealizedPl: +(parseFloat(sp.unrealized_pl) + parseFloat(lp.unrealized_pl)).toFixed(2),
       midCost: null,
@@ -146,7 +153,7 @@ export async function GET() {
     ]);
 
     const optionPositions = positionsRaw.filter((p) => p.asset_class === "us_option");
-    const spreads = reconstructSpreads(optionPositions, journalCredits());
+    const spreads = reconstructSpreads(optionPositions, journalOpenTrades());
     const spots = await latestSpots([...new Set(spreads.map((s) => s.underlying))]);
     const optQuotes = await latestOptionQuotes(
       spreads.flatMap((s) => [s.shortSymbol, s.longSymbol]),

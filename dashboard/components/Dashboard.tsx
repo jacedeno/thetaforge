@@ -19,6 +19,7 @@ interface Spread {
   expiration: string;
   qty: number;
   entryCredit: number;
+  openTs: string | null;
   currentCost: number;
   unrealizedPl: number;
   midCost: number | null;

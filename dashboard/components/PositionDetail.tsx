@@ -20,6 +20,7 @@ export interface OpenSpread {
   expiration: string;
   qty: number;
   entryCredit: number;
+  openTs?: string | null;
   midCost: number | null;
   midPl: number | null;
   unrealizedPl: number;
@@ -62,8 +63,14 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
     if (!ref.current) return;
     const el = ref.current;
     const to = new Date(Date.now() - 16 * 60_000).toISOString();
-    // 7 days of context plus enough lookback for SMA55 to be warm on screen.
-    const from = new Date(Date.now() - 7 * 86_400_000 - smaLookbackMs(tf)).toISOString();
+    const openMs = spread.openTs ? new Date(spread.openTs).getTime() : null;
+    // 7 days of context — stretched back to the entry when it's older — plus
+    // enough lookback for SMA55 to be warm on screen.
+    const windowStart = Math.min(
+      Date.now() - 7 * 86_400_000,
+      openMs != null ? openMs - 86_400_000 : Infinity,
+    );
+    const from = new Date(windowStart - smaLookbackMs(tf)).toISOString();
 
     let disposed = false;
     let onResizeRef: (() => void) | null = null;
@@ -118,6 +125,22 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
           price: spread.shortStrike - spread.entryCredit, color: token("--series-1"),
           lineWidth: 1, lineStyle: 3, title: "breakeven",
         });
+
+        // The entry marker — where the agent actually sold the spread.
+        if (openMs != null) {
+          let nearest = bars[0].time as number;
+          for (const b of bars) {
+            if (Math.abs((b.time as number) * 1000 - openMs) <
+                Math.abs(nearest * 1000 - openMs)) nearest = b.time as number;
+          }
+          import("lightweight-charts").then(({ createSeriesMarkers }) => {
+            if (!disposed) createSeriesMarkers(series, [{
+              time: nearest as Time, position: "belowBar",
+              color: token("--series-2"), shape: "arrowUp",
+              text: `SELL ${spread.entryCredit.toFixed(2)}cr ×${spread.qty}`,
+            }]);
+          });
+        }
         chart.timeScale().fitContent();
         const onResize = () => chart.applyOptions({ width: el.clientWidth });
         onResize();
@@ -131,7 +154,8 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
       chartRef.current?.remove();
       chartRef.current = null;
     };
-  }, [spread.underlying, spread.shortStrike, spread.longStrike, spread.entryCredit, themeTick, tf]);
+  }, [spread.underlying, spread.shortStrike, spread.longStrike, spread.entryCredit,
+      spread.openTs, spread.qty, themeTick, tf]);
 
   const width = spread.shortStrike - spread.longStrike;
   const maxProfit = spread.entryCredit * 100 * spread.qty;
@@ -170,6 +194,11 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
               : "held to time stop"} />
           <Level label="stop loss" value={`−${usd2(stopPerShare * 100 * spread.qty)}`} />
           <Level label="expiry" value={`${spread.expiration} · ${spread.dte}d`} />
+          <Level label="entered"
+            value={spread.openTs
+              ? new Date(spread.openTs).toLocaleString("en-US",
+                  { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+              : "—"} />
         </div>
       </div>
 
