@@ -33,8 +33,8 @@ Two edges, stacked:
     never price a trade.
 - Expiry: 7–21 DTE at entry.
 - Spread width: $5 (adjust per underlying price).
-- One position per underlying; max 13 open positions (retuned 2026-08-27
-  from 10 × 2% to 13 × 1.5% — same aggregate envelope, more shots).
+- One position per underlying; max 15 open positions (retuned 2026-08-27
+  from 10 × 2% to 15 × 1.5% — more, smaller shots; 22.5% aggregate).
 
 > Exits are unconstrained by day-trade limits: FINRA's PDT rule was eliminated
 > 2026-06-04 and replaced by intraday margin, so a spread that hits its profit
