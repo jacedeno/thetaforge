@@ -6,13 +6,15 @@
 
 ## Trading logic (through preflight, after close / P&L-threatening window)
 
-- [ ] **Reprice age cap** — a stale order older than ~10 min is cancelled
-  WITHOUT reprice; its signal died with it. Root cause of the 2-hour
-  COP/JPM/BA entries of 2026-08-26 (`LATE_FILL` in `verify_entries.py`).
-- [ ] **OCC root normalization** — `parse_strike` and every signal-symbol vs
-  OCC-root comparison must map dotted tickers (`BRK.B` → `BRKB`), with a
-  regression test. BRK.B rejoins the universe only after this lands.
-  (Crashed the scanner in a 65-second loop at the 2026-08-27 open.)
+- [x] **Reprice age cap** — SHIPPED 2026-08-27 post-close
+  (`reprice_max_age_s: 600`): a stale order older than 10 min is cancelled
+  without reprice; its signal died with it.
+- [x] **OCC root normalization** — SHIPPED 2026-08-27 post-close:
+  `occ_root()` in parse_strike, the duplicate gate, journal enrichment and
+  the dashboard signal matcher, with regression tests. **BRK.B stays out of
+  the universe for the competition** (Jose's call to re-add — its option
+  chain is thin and would likely veto anyway; dashboard spot lookup for
+  dotted roots is untested).
 - [ ] **Data feed decision** — the agent's bars are free-plan SIP: complete,
   but minus the last 15 minutes, so every "5-minute" signal fires 15–20 min
   after its bar. Decide: pay for real-time SIP · switch the signal to
@@ -47,17 +49,15 @@
   (root, expiration, kind); two same-expiry spreads on one underlying merge
   and `avg_entry_price` averages their fills. Mitigated (journal credit is
   preferred; entry gates block the doubling); structural fix pending.
-- [ ] **Spread-level inverted-cost guard** — at the 2026-08-27 open BA's
-  legs quoted uncrossed individually but the SPREAD was inverted
-  (long mid > short mid → cost −1.15); `evaluate_exit` read it as a profit
-  target and parked an unfillable 0.02 close. Guard: `cost <= 0` means the
-  quotes are garbage → HOLD, never a profit target.
-- [ ] **Exit-order chase** — exits are exempt from stale cancels by design,
-  so an unfilled close limit rests forever while its position sits
-  unmanaged (COP's stop rested 3 h; the operator reset needed up to three
-  re-prices per spread to fill). Mirror the entry logic: an unfilled exit
-  older than ~2–3 min is cancelled and re-placed at the fresh natural —
-  the position must never be left without a working exit.
+- [x] **Spread-level inverted-cost guard** — SHIPPED 2026-08-27 post-close:
+  `cost <= 0` in `evaluate_exit` is a garbage-tick signature → HOLD with a
+  `quote_anomaly` event, never a profit target (BA's −1.15 open quote had
+  parked an unfillable 0.02 close).
+- [x] **Exit-order chase** — SHIPPED 2026-08-27 post-close
+  (`exit_stale_after_s: 120`): an unfilled close resting past 2 min is
+  cancelled and the same monitor pass re-decides at the fresh cost
+  (`exit_stale` event). A position never sits unmanaged behind a resting
+  limit again (COP's stop had rested 3 h).
 
 ## Cosmetic / observability (any time)
 

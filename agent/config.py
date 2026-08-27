@@ -26,6 +26,14 @@ class StrategyConfig:
     max_signal_strength: float = 0.02
     max_new_per_sector_per_scan: int = 1   # one fresh bet per sector per scan
     order_stale_after_s: int = 180         # cancel unfilled entries after 3 minutes
+    # A stale entry older than this is cancelled WITHOUT a reprice — its
+    # signal died with it. (2026-08-26: a downed monitor swept 2-hour-old
+    # orders into blind reprices; the worst entries of the day.)
+    reprice_max_age_s: int = 600
+    # An unfilled exit older than this is cancelled so the next pass can
+    # re-decide at the fresh cost — a position must never sit unmanaged
+    # behind a resting close (2026-08-27: COP's stop rested three hours).
+    exit_stale_after_s: int = 120
     entry_concession_pct: float = 0.03     # shade the entry limit below mid to actually fill
     entry_concession_min: float = 0.01
     profit_target_pct: float = 0.50        # close at 50% of collected credit

@@ -1,7 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from agent.execution.stale import age_seconds, is_entry, select_stale
+from agent.execution.stale import (
+    age_seconds,
+    is_entry,
+    is_exit,
+    select_stale,
+    select_stale_exits,
+)
 
 NOW = datetime(2026, 8, 25, 14, 0, 0, tzinfo=timezone.utc)
 
@@ -45,10 +51,25 @@ def test_fresh_entry_kept():
     assert select_stale([order(["sell_to_open", "buy_to_open"], minutes_old=1)], 180, NOW) == []
 
 
-def test_exit_order_never_cancelled():
-    """An exit must be allowed to work — a position needs to be able to close."""
+def test_exit_order_never_selected_by_entry_rule():
+    """The ENTRY stale rule must not touch exits — they have their own chase."""
     old_exit = order(["buy_to_close", "sell_to_close"], minutes_old=120)
     assert select_stale([old_exit], 180, NOW) == []
+
+
+def test_exit_chase_selects_old_unfilled_exits():
+    """An exit resting past its window is cancelled so the next decision
+    re-places it at fresh cost (2026-08-27: a stop rested three hours)."""
+    old_exit = order(["buy_to_close", "sell_to_close"], minutes_old=10)
+    fresh_exit = order(["buy_to_close", "sell_to_close"], minutes_old=1)
+    entry = order(["sell_to_open", "buy_to_open"], minutes_old=10)
+    assert is_exit(old_exit) and not is_exit(entry)
+    assert select_stale_exits([old_exit, fresh_exit, entry], 120, NOW) == [old_exit]
+
+
+def test_partially_filled_exit_not_chased():
+    partial = order(["buy_to_close", "sell_to_close"], filled="2", minutes_old=10)
+    assert select_stale_exits([partial], 120, NOW) == []
 
 
 def test_partially_filled_entry_kept():

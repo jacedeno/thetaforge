@@ -167,7 +167,9 @@ def enrich(trip: dict, events: list[dict], underlying: str) -> dict:
     """Attach signal strength (nearest before open) and exit reason (nearest close event)."""
     strength, reason = None, None
     for e in events:
-        if e.get("symbol") != underlying:
+        # events carry the ticker, `underlying` is the OCC root — normalize
+        # dotted classes (BRK.B vs BRKB) or enrichment silently misses.
+        if (e.get("symbol") or "").replace(".", "") != underlying:
             continue
         if e["type"] == "signal" and e["ts"] <= trip["open_ts"]:
             strength = e.get("strength")

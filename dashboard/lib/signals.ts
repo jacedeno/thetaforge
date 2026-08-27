@@ -30,9 +30,13 @@ export function findSignal(
       if (t <= openMs) anchor = t;
     }
   }
+  // events carry the ticker, the journal carries the OCC root — normalize
+  // dotted share classes (BRK.B vs BRKB).
+  const root = underlying.replace(".", "");
   let sig: Ev | null = null;
   for (const e of events) {
-    if (e.type === "signal" && e.symbol === underlying && Date.parse(e.ts) <= anchor)
+    if (e.type === "signal" && String(e.symbol ?? "").replace(".", "") === root &&
+        Date.parse(e.ts) <= anchor)
       sig = e;
   }
   if (!sig) return null;

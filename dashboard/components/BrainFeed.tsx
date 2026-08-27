@@ -20,6 +20,8 @@ const COLORS: Record<string, string> = {
   order_reprice_skipped: "var(--ink-muted)",
   position_unmanageable: "var(--critical)",
   journal_price_mismatch: "var(--ink-secondary)",
+  exit_stale: "var(--series-2)",
+  quote_anomaly: "var(--ink-secondary)",
 };
 
 function friendlyVeto(reason: string): string {
@@ -67,6 +69,10 @@ function line(e: Ev): string {
       return `${e.symbol}: credit $${e.credit} is too small to manage — holding to the time stop instead of paying the spread to exit`;
     case "journal_price_mismatch":
       return `order ${e.client_order_id ?? e.order_id}: parent and leg fill prices disagree by $${e.divergence} — trusting the legs`;
+    case "exit_stale":
+      return `${e.symbol}: close order sat unfilled ${Math.round(Number(e.age_s) / 60)} min — pulling it to re-price at the current cost`;
+    case "quote_anomaly":
+      return `${e.symbol}: the spread's quotes look inverted — ignoring them this pass rather than acting on garbage`;
     default:
       return JSON.stringify(e);
   }

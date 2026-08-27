@@ -5,8 +5,11 @@ fills: the credit it asks for no longer exists in the market. Left alone it
 either sits unfilled all session, tying up buying power, or fills much later
 under conditions that no longer match the signal that justified it.
 
-Entries are therefore cancelled after a short window. Exits are never cancelled
-here — an open position must be allowed to close.
+Entries are therefore cancelled after a short window. Exits are never
+cancelled by the ENTRY rule — but an unfilled exit is chased: after its own
+window it is cancelled so the monitor's next decision re-places it at the
+fresh cost. A position must always have a WORKING path to close, which a
+resting limit nobody crosses is not (2026-08-27: a stop rested three hours).
 """
 
 from __future__ import annotations
@@ -46,6 +49,23 @@ def select_stale(orders: list, max_age_s: int, now: datetime | None = None) -> l
     return [
         o for o in orders
         if is_entry(o)
+        and float(getattr(o, "filled_qty", 0) or 0) == 0
+        and age_seconds(o, now) > max_age_s
+    ]
+
+
+def is_exit(order) -> bool:
+    """True when every leg closes a position."""
+    legs = getattr(order, "legs", None) or []
+    intents = {_intent(leg) for leg in legs}
+    return bool(intents) and all(i.endswith("to_close") for i in intents)
+
+
+def select_stale_exits(orders: list, max_age_s: int, now: datetime | None = None) -> list:
+    """Unfilled exit orders old enough to cancel and re-decide at fresh cost."""
+    return [
+        o for o in orders
+        if is_exit(o)
         and float(getattr(o, "filled_qty", 0) or 0) == 0
         and age_seconds(o, now) > max_age_s
     ]

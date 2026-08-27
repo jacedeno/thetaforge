@@ -72,7 +72,13 @@ def run_monitor(dry_run: bool = True) -> None:
     # crosses the NBBO, so mid-anchored orders mostly sit. Real fills beat
     # perfect prices in a P&L-judged environment.
     open_orders = broker.open_option_orders()
-    from agent.execution.stale import is_retry, select_stale, spread_legs
+    from agent.execution.stale import (
+        age_seconds,
+        is_retry,
+        select_stale,
+        select_stale_exits,
+        spread_legs,
+    )
 
     # The stale pass cancels and REPRICES (= submits real orders). It must
     # honor dry_run: preflight runs a dry monitor pass on every restart and
@@ -93,6 +99,12 @@ def run_monitor(dry_run: bool = True) -> None:
             continue
         if is_retry(o):
             continue  # one reprice per spread — never chase further
+        # A signal this old is dead: a downed monitor must not sweep hour-old
+        # orders into blind re-entries on restart (2026-08-26, COP/JPM/BA).
+        if age_seconds(o) > cfg.strategy.reprice_max_age_s:
+            events.emit("order_reprice_skipped", symbol=stale_sym,
+                        reason=f"order {int(age_seconds(o) // 60)}m old — its signal is stale")
+            continue
         legs = spread_legs(o)
         if legs is None:
             continue
@@ -126,8 +138,23 @@ def run_monitor(dry_run: bool = True) -> None:
                         qty=int(float(o.qty)), natural=natural, status=order["status"])
         except Exception:
             log.exception("reprice failed for %s", o.id)
+    # Exit chase: an unfilled close that sat past its window is cancelled so
+    # the decision loop below re-places it at the FRESH cost this same pass —
+    # a position must never sit unmanaged behind a resting limit.
+    stale_exits = select_stale_exits(open_orders, cfg.strategy.exit_stale_after_s)
+    for o in stale_exits if not dry_run else []:
+        legs_for_name = [l.symbol for l in (getattr(o, "legs", None) or [])]
+        exit_sym = parse_occ(legs_for_name[0]).root if legs_for_name else "?"
+        try:
+            broker.cancel_order(str(o.id))
+            log.info("cancelled stale exit %s (%s) — re-deciding at fresh cost", o.id, exit_sym)
+            events.emit("exit_stale", symbol=exit_sym,
+                        age_s=int(age_seconds(o)), limit=float(o.limit_price or 0))
+        except Exception:
+            log.exception("could not cancel stale exit %s", o.id)
+
     if not dry_run:
-        open_orders = [o for o in open_orders if o not in stale]
+        open_orders = [o for o in open_orders if o not in stale and o not in stale_exits]
 
     # Symbols with an open (pending) order are skipped to avoid duplicates.
     pending = set()
@@ -162,7 +189,9 @@ def run_monitor(dry_run: bool = True) -> None:
         log.info("%s x%d: %s — %s", sp.underlying, sp.qty, decision.action, decision.reason)
         if decision.flag and sp.underlying not in _flagged_unmanageable:
             _flagged_unmanageable.add(sp.underlying)
-            events.emit("position_unmanageable", symbol=sp.underlying,
+            event = ("quote_anomaly" if decision.flag == "bad_quotes"
+                     else "position_unmanageable")
+            events.emit(event, symbol=sp.underlying,
                         credit=sp.entry_credit, reason=decision.reason)
         if decision.action == "CLOSE":
             events.emit("exit_signal", symbol=sp.underlying, reason=decision.reason,

@@ -121,9 +121,23 @@ def test_exit_band_floor_widens_target():
     assert "profit target" in d.reason
 
 
+def test_inverted_spread_quote_holds():
+    """Long mid above short mid = garbage tick, not a profit target — BA's
+    2026-08-27 open quote (cost −1.15) parked an unfillable 0.02 close."""
+    d = evaluate_exit(make_spread(), short_mid=0.30, long_mid=1.45,
+                      strategy=CFG, today=TODAY)
+    assert d.action == "HOLD"
+    assert d.flag == "bad_quotes"
+    # even inside the time-stop window: never act on inverted quotes
+    d = evaluate_exit(make_spread(exp=date(2026, 8, 25)), short_mid=0.30,
+                      long_mid=1.45, strategy=CFG, today=TODAY)
+    assert d.action == "HOLD"
+
+
 def test_zero_credit_holds():
-    """A zero/negative reconstructed credit used to fire the stop instantly."""
-    d = evaluate_exit(make_spread(credit=0.0), short_mid=0.30, long_mid=0.30,
+    """A zero/negative reconstructed credit used to fire the stop instantly.
+    (Cost must be positive here — a zero cost trips the inverted-quote guard.)"""
+    d = evaluate_exit(make_spread(credit=0.0), short_mid=0.55, long_mid=0.30,
                       strategy=CFG, today=TODAY)
     assert d.action == "HOLD"
     assert d.flag == "non_positive_credit"

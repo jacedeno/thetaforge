@@ -33,6 +33,16 @@ def test_all_gates_pass():
     assert r.passed
 
 
+def test_dotted_ticker_duplicate_detected():
+    """held carries OCC roots (BRKB); the candidate carries the ticker
+    (BRK.B) — without normalization a dotted class double-enters."""
+    from dataclasses import replace
+
+    cand = replace(make_candidate(), underlying="BRK.B")
+    r = check_all(cand, 5, 100_000, 50_000, 0, {"BRKB"}, RISK)
+    assert not r.passed and "already holding" in r.reason
+
+
 def test_veto_duplicate_underlying():
     r = check_all(make_candidate(), 5, 100_000, 50_000, 1, {"NVDA"}, RISK)
     assert not r.passed and "already holding" in r.reason

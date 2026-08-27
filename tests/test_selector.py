@@ -127,6 +127,15 @@ def test_build_rejects_crossed_short_quote():
     assert cand is None
 
 
+def test_parse_strike_dotted_root():
+    """OCC symbols strip the class dot (BRK.B -> BRKB): slicing the ticker's
+    own length crashed the scanner in a 65-second loop on 2026-08-27."""
+    from agent.options.selector import parse_strike
+
+    assert parse_strike("BRKB260904P00500000", "BRK.B") == (date(2026, 9, 4), 500.0)
+    assert parse_strike("CSCO260904P00110000", "CSCO") == (date(2026, 9, 4), 110.0)
+
+
 def test_delta_band_excludes_at_the_money():
     assert S.min_short_delta <= 0.25 <= S.max_short_delta
     assert 0.42 > S.max_short_delta          # near-ATM strikes are out of band

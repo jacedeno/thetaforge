@@ -34,6 +34,14 @@ class OccContract:
     strike: float
 
 
+def occ_root(ticker: str) -> str:
+    """Ticker → OCC option root: dotted share classes lose the dot
+    (BRK.B → BRKB). Comparisons between signal symbols and option roots
+    must go through this — slicing len('BRK.B') off 'BRKB…' crashed the
+    scanner on 2026-08-27."""
+    return ticker.replace(".", "")
+
+
 def parse_occ(symbol: str) -> OccContract:
     m = _OCC.match(symbol)
     if not m:
@@ -130,6 +138,16 @@ def evaluate_exit(
     """
     today = today or date.today()
     cost = round(short_mid - long_mid, 2)   # debit to buy the spread back
+
+    if cost <= 0:
+        # Long mid above short mid: the legs may quote uncrossed individually
+        # while the SPREAD is inverted — a garbage-tick signature (2026-08-27
+        # open: BA at cost −1.15 read as "profit target" and parked an
+        # unfillable close). No rule may act on quotes like these.
+        return ExitDecision(
+            "HOLD", f"inverted spread quote (cost {cost:.2f}) — skipping this pass",
+            cost, flag="bad_quotes",
+        )
 
     dte = (spread.expiration - today).days
     if dte <= TIME_STOP_DTE:

@@ -24,6 +24,7 @@ from alpaca.data.historical.option import OptionHistoricalDataClient
 from alpaca.data.requests import OptionChainRequest
 
 from agent.config import RiskConfig, StrategyConfig
+from agent.execution.monitor import occ_root
 
 
 @dataclass(frozen=True)
@@ -82,7 +83,9 @@ def is_tradable(quote, risk: RiskConfig, min_mid: float = 0.0) -> bool:
 
 
 def parse_strike(symbol: str, root: str) -> tuple[date, float]:
-    core = symbol[len(root):]
+    # OCC symbols use the dotted-class-stripped root (BRK.B -> BRKB) —
+    # slicing the ticker's own length crashed the scanner on 2026-08-27.
+    core = symbol[len(occ_root(root)):]
     exp = date(2000 + int(core[0:2]), int(core[2:4]), int(core[4:6]))
     return exp, int(core[7:15]) / 1000
 

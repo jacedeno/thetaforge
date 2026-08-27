@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from agent.config import RiskConfig
+from agent.execution.monitor import occ_root
 from agent.options.selector import SpreadCandidate
 
 
@@ -33,7 +34,9 @@ def check_all(
 ) -> GateResult:
     if qty < 1:
         return GateResult(False, "position risk budget below one spread")
-    if spread.underlying in held_underlyings:
+    # held_underlyings carries OCC roots (from position symbols); the
+    # candidate carries the ticker — normalize or dotted classes slip through.
+    if occ_root(spread.underlying) in held_underlyings:
         return GateResult(False, f"already holding a position on {spread.underlying}")
     if open_positions_count >= risk.max_open_positions:
         return GateResult(False, "max open positions reached")
