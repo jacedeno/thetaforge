@@ -61,6 +61,15 @@
 - [ ] **Dashboard-side strategy variables** — delta band, credit floors,
   exit thresholds tunable from the dashboard, gated behind preflight.
   (For the competition the dashboard is read-only visualization.)
+- [ ] **Signal → long-call overlay experiment** — same ML30 trigger, long
+  call instead of a put credit spread. Backtest it from the agent's own
+  instrumented signal events (exact price and bar per signal) and compare
+  the two structures in aggregate — win rate, expectancy, drawdown — not
+  on cherry-picked days. Motivation (2026-08-27): on the day's three open
+  positions a call would have been 1 clear win (AAPL +1.41%), 1 wash
+  (GOOGL +0.23% ≈ theta + spread), 1 loss (BAC −0.14%), while the spreads
+  were green or flat on all three — the structures pay off in different
+  scenario mixes, so the comparison must be aggregate.
 
 ## Shipped during the burn-in (for context)
 
