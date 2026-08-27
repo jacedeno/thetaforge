@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  createChart, CandlestickSeries, type IChartApi, type CandlestickData, type Time,
+  createChart, CandlestickSeries, LineSeries,
+  type IChartApi, type CandlestickData, type Time,
 } from "lightweight-charts";
 import type { Trade } from "./TradeHistory";
+import {
+  sma, smaLookbackMs, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
+} from "@/lib/sma";
 
 const TIMEFRAMES = ["5Min", "15Min", "30Min", "1Hour", "1Day"] as const;
 const TF_LABEL: Record<string, string> = {
@@ -66,7 +70,8 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
     // view instead of the same fixed ±days a week-long trade needs.
     const span = Math.max(closeMs - openMs, 60_000);
     const pad = Math.max(span * 2, 3 * 3_600_000);
-    const from = new Date(openMs - pad).toISOString();
+    // Extra lookback so the SMAs are warm well before the entry marker.
+    const from = new Date(openMs - pad - smaLookbackMs(tf)).toISOString();
     const to = new Date(Math.min(closeMs + pad, Date.now() - 16 * 60_000)).toISOString();
 
     let disposed = false;
@@ -102,6 +107,17 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
           downColor: down, wickDownColor: down, borderDownColor: down,
         });
         series.setData(bars);
+
+        // The signal's own averages, so the entry can be checked against the
+        // cross that fired it: fast orange, slow red.
+        for (const [period, color] of [
+          [SMA_FAST, SMA_FAST_COLOR], [SMA_SLOW, SMA_SLOW_COLOR],
+        ] as [number, string][]) {
+          chart.addSeries(LineSeries, {
+            color, lineWidth: 1, priceLineVisible: false,
+            lastValueVisible: false, crosshairMarkerVisible: false,
+          }).setData(sma(bars, period));
+        }
 
         // The options twist: strikes as price lines — the profit frontier is visible.
         series.createPriceLine({
@@ -191,7 +207,12 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
 
   return (
     <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: "var(--grid)" }}>
-      <div className="mb-2 flex justify-end gap-1" role="group" aria-label="Chart timeframe">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-mono2 text-[11px]">
+          <span style={{ color: SMA_FAST_COLOR }}>— SMA{SMA_FAST}</span>{"  "}
+          <span style={{ color: SMA_SLOW_COLOR }}>— SMA{SMA_SLOW}</span>
+        </span>
+        <div className="flex gap-1" role="group" aria-label="Chart timeframe">
         {TIMEFRAMES.map((t) => (
           <button key={t} onClick={() => setTf(t)} aria-pressed={t === tf}
             className="font-mono2 rounded px-2 py-0.5 text-xs transition-opacity hover:opacity-80"
@@ -201,6 +222,7 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
             {TF_LABEL[t]}
           </button>
         ))}
+        </div>
       </div>
       <div ref={ref} className="w-full" />
       {txns.length > 0 && (

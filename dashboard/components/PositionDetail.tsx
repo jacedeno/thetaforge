@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  createChart, CandlestickSeries, type IChartApi, type CandlestickData, type Time,
+  createChart, CandlestickSeries, LineSeries,
+  type IChartApi, type CandlestickData, type Time,
 } from "lightweight-charts";
 import PayoffDiagram from "./PayoffDiagram";
+import {
+  sma, smaLookbackMs, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
+} from "@/lib/sma";
 
 const TIMEFRAMES = ["5Min", "15Min", "1Hour", "1Day"] as const;
 const TF_LABEL: Record<string, string> = { "5Min": "5m", "15Min": "15m", "1Hour": "1h", "1Day": "1d" };
@@ -58,7 +62,8 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
     if (!ref.current) return;
     const el = ref.current;
     const to = new Date(Date.now() - 16 * 60_000).toISOString();
-    const from = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    // 7 days of context plus enough lookback for SMA55 to be warm on screen.
+    const from = new Date(Date.now() - 7 * 86_400_000 - smaLookbackMs(tf)).toISOString();
 
     let disposed = false;
     let onResizeRef: (() => void) | null = null;
@@ -91,6 +96,16 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
           downColor: down, wickDownColor: down, borderDownColor: down,
         });
         series.setData(bars);
+        // The signal's own averages — fast orange, slow red — so the entry
+        // can be checked against the cross that fired it.
+        for (const [period, color] of [
+          [SMA_FAST, SMA_FAST_COLOR], [SMA_SLOW, SMA_SLOW_COLOR],
+        ] as [number, string][]) {
+          chart.addSeries(LineSeries, {
+            color, lineWidth: 1, priceLineVisible: false,
+            lastValueVisible: false, crosshairMarkerVisible: false,
+          }).setData(sma(bars, period));
+        }
         series.createPriceLine({
           price: spread.shortStrike, color: token("--series-2"), lineWidth: 2,
           lineStyle: 0, title: `short ${spread.shortStrike} — profit above`,
@@ -159,7 +174,11 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
       </div>
 
       <div className="mb-2 mt-4 flex items-center justify-between">
-        <div className="eyebrow">{spread.underlying} price · strikes drawn on the chart</div>
+        <div className="eyebrow">
+          {spread.underlying} price · strikes drawn on the chart ·{" "}
+          <span className="font-mono2 normal-case" style={{ color: SMA_FAST_COLOR }}>— SMA{SMA_FAST}</span>{" "}
+          <span className="font-mono2 normal-case" style={{ color: SMA_SLOW_COLOR }}>— SMA{SMA_SLOW}</span>
+        </div>
         <div className="flex gap-1" role="group" aria-label="Chart timeframe">
           {TIMEFRAMES.map((t) => (
             <button key={t} onClick={() => setTf(t)} aria-pressed={t === tf}
