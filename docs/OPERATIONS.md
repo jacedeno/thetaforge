@@ -75,7 +75,25 @@ out-of-band order is ever unavoidable, keep its client_order_id outside the
 `tf-open-*` / `tf-retry-*` namespace so the journal tags it `manual` and the
 stats ignore it.
 
-## Scheduled for after the close, 2026-08-27 (burn-in finding)
+## Burn-in incident, 2026-08-27 09:00 CT — BRK.B crash loop
+
+Minutes after the open, `parse_strike` crashed on BRK.B: its OCC option
+symbols use the dotted-root stripped form (`BRKB...`), while the selector
+slices `len("BRK.B")` characters off the symbol. The exception escaped
+mid-scan, the scan slot never latched, and the loop re-ran the scan every
+~65 s (DEGRADED, `consecutive_failures` climbing) — with every signal
+stronger than BRK.B's blocked behind the crash. Contained at parameter
+level within minutes (BRK.B removed from `universe.json` — it had entered
+in the 2026-08-26 universe expansion and fired its first signal today),
+restart through preflight, clean single scan on the next slot. Code fix
+scheduled below.
+
+## Scheduled for after the close, 2026-08-27 (burn-in findings)
+
+**OCC root normalization.** `parse_strike` (and every comparison between
+signal symbols and OCC roots — `held` sets, duplicate gates) must map
+dotted tickers to their OCC root (`BRK.B` → `BRKB`), with a regression
+test. BRK.B returns to the universe only after that lands.
 
 The stale-order reprice re-enters at the natural price **without
 re-validating the signal's age** — it checks only the credit floor and
