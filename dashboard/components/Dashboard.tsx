@@ -281,7 +281,7 @@ export default function Dashboard() {
               style={{ color: "var(--accent)" }}>
               GeekendZone
             </a>
-            <p className="mt-0.5">Researched, written and built by Jose Cedeno. Built on bare metal.</p>
+            <p className="mt-0.5">Crafted by Jose Cedeno. Built on bare metal.</p>
           </div>
           <nav className="flex flex-wrap items-center gap-4" aria-label="Elsewhere">
             {[
