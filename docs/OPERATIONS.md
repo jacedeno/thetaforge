@@ -60,6 +60,22 @@ heartbeat). Detection no longer depends on a human noticing odd behavior.
 | Fri 8:00 | Account swap only (`.env` + restart through preflight). No other change |
 | Competition week | Dashboard/docs may change (they don't trade). Agent code: only for a P&L-threatening defect, with tests, through preflight |
 
+## Account swap checklist (competition start — after the kickoff, per the
+## Discord moderators: "start after kick off", confirmed 2026-08-27)
+
+1. Read the released conditions FIRST — account requirements, judged
+   window, capital. Only then create/reset the competition paper account.
+2. New keys into `.env` (agent) and `dashboard/.env.local` (dashboard).
+   Keep `ALPACA_DATA_FEED=sip` in the dashboard env.
+3. `bash scripts/preflight.sh` — must PASS against the new account.
+4. Restart the loop (kill the tree with LITERAL pids — zsh does not split
+   `$pids` — then `setsid nohup ./scripts/run_loop.sh &`) and the dashboard
+   (`run_dashboard.sh`). Verify exactly ONE agent tree.
+5. Verify: heartbeat healthy, dashboard shows the NEW account number,
+   `data/thetaforge.db` starts empty for the new account (archive the
+   burn-in db/logs to `archive/` like the dev account).
+6. One full monitor cycle in the log before walking away (Rule 4).
+
 ## Rule 4 — Change discipline (standing)
 
 Every agent change, however small: tests → preflight → restart → watch one
