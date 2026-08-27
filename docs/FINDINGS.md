@@ -1,0 +1,59 @@
+# Findings backlog — burn-in 2026-08-27
+
+> The working list. Each item gets checked off as it ships; the full stories
+> live in [`OPERATIONS.md`](OPERATIONS.md). Rule 3 governs WHEN each class of
+> change may land (trading logic through preflight, dashboard/docs any time).
+
+## Trading logic (through preflight, after close / P&L-threatening window)
+
+- [ ] **Reprice age cap** — a stale order older than ~10 min is cancelled
+  WITHOUT reprice; its signal died with it. Root cause of the 2-hour
+  COP/JPM/BA entries of 2026-08-26 (`LATE_FILL` in `verify_entries.py`).
+- [ ] **OCC root normalization** — `parse_strike` and every signal-symbol vs
+  OCC-root comparison must map dotted tickers (`BRK.B` → `BRKB`), with a
+  regression test. BRK.B rejoins the universe only after this lands.
+  (Crashed the scanner in a 65-second loop at the 2026-08-27 open.)
+- [ ] **Data feed decision** — the agent's bars are free-plan SIP: complete,
+  but minus the last 15 minutes, so every "5-minute" signal fires 15–20 min
+  after its bar. Decide: pay for real-time SIP · switch the signal to
+  real-time IEX (thin bars — AAPL premarket had 1-trade candles) · accept
+  the delay as part of the system.
+- [ ] **Pre-market trigger bars** — with the SIP delay, the day's first scans
+  evaluate pre-market bars (AAPL's 2026-08-27 trigger bar was 8:25 CT).
+  Decide whether the trigger requires regular-hours bars.
+- [ ] **`max_signal_strength` 0.02** — raised from 0.012 for the 5m burn-in
+  (on 5m the ceiling mostly vetoes opening-gap crosses). Review with the
+  live signal data (`sma55`/`sma21`/`bar_time` now logged per signal) and
+  lock the value for competition week.
+- [ ] **Selector hardening, deferred half** — delta-vs-price plausibility
+  check and short-leg minimum bid (deliberately not shipped 2026-08-26).
+- [ ] **Same-expiry spread collapse** — `reconstruct_spreads` keys legs by
+  (root, expiration, kind); two same-expiry spreads on one underlying merge
+  and `avg_entry_price` averages their fills. Mitigated (journal credit is
+  preferred; entry gates block the doubling); structural fix pending.
+
+## Cosmetic / observability (any time)
+
+- [ ] `run_scan.py` emits `universe=80` hardcoded — emit `len(symbols)`
+  (the universe is 79 since BRK.B left).
+- [ ] `ml30.fetch_bars` docstring still says "15-minute bars" (code is 5-min).
+
+## Post-competition
+
+- [ ] **Dashboard-side strategy variables** — delta band, credit floors,
+  exit thresholds tunable from the dashboard, gated behind preflight.
+  (For the competition the dashboard is read-only visualization.)
+
+## Shipped during the burn-in (for context)
+
+- [x] Exit-band absolute floors; unmanageable-credit HOLD; exit-limit
+  floor/width cap; dry-run gating of cancels and reprices (2026-08-26)
+- [x] One `entry_credit` definition (leg fills → journal → monitor and
+  dashboard); trade provenance `agent|manual`, manual excluded from stats
+- [x] Selector: crossed quotes rejected, open interest enforced, penny
+  rescue closed, `entry_limit` logged
+- [x] Signal instrumentation (`sma55`/`sma21`/`bar_time` per signal) +
+  `scripts/verify_entries.py` + `scripts/diagnose_trade.py`
+- [x] Dashboard audit view: SMAs (21 blue / 55 orange), SIGNAL/SELL/CLOSE
+  markers, per-timeframe default ranges, local-time axes, SIP feed matched
+  to the agent's data, 5m default on positions

@@ -88,6 +88,9 @@ in the 2026-08-26 universe expansion and fired its first signal today),
 restart through preflight, clean single scan on the next slot. Code fix
 scheduled below.
 
+> The actionable checklist distilled from these findings lives in
+> [`FINDINGS.md`](FINDINGS.md) — work through it there.
+
 ## Scheduled for after the close, 2026-08-27 (burn-in findings)
 
 **OCC root normalization.** `parse_strike` (and every comparison between

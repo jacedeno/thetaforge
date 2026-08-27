@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  createChart, CandlestickSeries, LineSeries,
+  createChart, CandlestickSeries, HistogramSeries, LineSeries,
   type IChartApi, type CandlestickData, type Time,
 } from "lightweight-charts";
 import PayoffDiagram from "./PayoffDiagram";
@@ -10,7 +10,7 @@ import {
   DEFAULT_RANGE_S, sma, smaLookbackMs,
   SIGNAL_COLOR, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
 } from "@/lib/sma";
-import { toLocal, toLocalMs } from "@/lib/localtime";
+import { EXTENDED_HOURS_SHADE, isExtendedHours, toLocal, toLocalMs } from "@/lib/localtime";
 
 const TIMEFRAMES = ["5Min", "15Min", "1Hour", "1Day"] as const;
 const TF_LABEL: Record<string, string> = { "5Min": "5m", "15Min": "15m", "1Hour": "1h", "1Day": "1d" };
@@ -107,6 +107,19 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
           crosshair: { mode: 0 },
         });
         chartRef.current = chart;
+        // Faint full-height wash behind pre/after-market candles (drawn
+        // first so candles and SMAs render on top). Meaningless on dailies.
+        if (tf !== "1Day") {
+          const shade = chart.addSeries(HistogramSeries, {
+            color: EXTENDED_HOURS_SHADE, priceScaleId: "xh",
+            lastValueVisible: false, priceLineVisible: false,
+          });
+          shade.setData(rawBars.map((b, i) => ({
+            time: bars[i].time,
+            value: isExtendedHours(b.time as number) ? 1 : 0,
+          })));
+          chart.priceScale("xh").applyOptions({ scaleMargins: { top: 0, bottom: 0 } });
+        }
         const series = chart.addSeries(CandlestickSeries, {
           upColor: up, wickUpColor: up, borderUpColor: up,
           downColor: down, wickDownColor: down, borderDownColor: down,
