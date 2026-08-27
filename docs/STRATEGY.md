@@ -33,7 +33,8 @@ Two edges, stacked:
     never price a trade.
 - Expiry: 7–21 DTE at entry.
 - Spread width: $5 (adjust per underlying price).
-- One position per underlying; max 10 open positions.
+- One position per underlying; max 13 open positions (retuned 2026-08-27
+  from 10 × 2% to 13 × 1.5% — same aggregate envelope, more shots).
 
 > Exits are unconstrained by day-trade limits: FINRA's PDT rule was eliminated
 > 2026-06-04 and replaced by intraday margin, so a spread that hits its profit
@@ -88,7 +89,7 @@ $0.63 (price improvement).
 
 ## Position sizing
 
-Max risk per position (width − credit) ≤ 2% of account equity.
+Max risk per position (width − credit) ≤ 1.5% of account equity.
 Total buying-power usage ≤ 50%.
 These sit inside the canonical band for short-premium systems — the derivation
 and literature comparison live in [`risk-sizing.md`](risk-sizing.md).

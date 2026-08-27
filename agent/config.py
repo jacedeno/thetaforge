@@ -41,8 +41,12 @@ class StrategyConfig:
 class RiskConfig:
     """Hard risk gates enforced before any order leaves the agent."""
 
-    max_risk_per_position_pct: float = 0.02   # of account equity
-    max_open_positions: int = 10
+    # 1.5% x 13 ~= 19.5% aggregate worst case — same envelope as the original
+    # 2% x 10, traded for more, smaller positions (Jose, 2026-08-27: more
+    # concurrent positions has historically helped results; measuring the
+    # veto counts to confirm). UNDER REVIEW with the burn-in data.
+    max_risk_per_position_pct: float = 0.015  # of account equity
+    max_open_positions: int = 13
     max_buying_power_usage_pct: float = 0.50
     min_open_interest: int = 500              # per leg
     # A leg is tradable if its quote is tight in RELATIVE or ABSOLUTE terms.

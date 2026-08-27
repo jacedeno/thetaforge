@@ -21,8 +21,11 @@ def make_candidate(credit=1.00, width=5.0):
 
 
 def test_position_qty_respects_risk_budget():
-    # $100k * 2% = $2,000 budget; max risk/spread = $400 -> 5 contracts
-    assert position_qty(make_candidate(), 100_000, RISK) == 5
+    # budget = equity x max_risk_per_position_pct; max risk/spread = $400
+    # (tied to the config so a sizing retune can't silently rot this test)
+    expected = int(100_000 * RISK.max_risk_per_position_pct // 400)
+    assert position_qty(make_candidate(), 100_000, RISK) == expected
+    assert expected >= 1
 
 
 def test_all_gates_pass():

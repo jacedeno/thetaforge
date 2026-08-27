@@ -21,6 +21,12 @@
 - [ ] **Pre-market trigger bars** — with the SIP delay, the day's first scans
   evaluate pre-market bars (AAPL's 2026-08-27 trigger bar was 8:25 CT).
   Decide whether the trigger requires regular-hours bars.
+- [ ] **Sizing experiment 13 × 1.5%** — retuned 2026-08-27 midday from
+  10 × 2% (same ~20% aggregate envelope, more concurrent positions; the cap
+  had vetoed 14 signals that morning). Measure with
+  `scripts/veto_summary.py`: veto counts by reason, especially "max open
+  positions" and risk-budget rejections, and compare results before locking
+  for competition week.
 - [ ] **`max_signal_strength` 0.02** — raised from 0.012 for the 5m burn-in
   (on 5m the ceiling mostly vetoes opening-gap crosses). Review with the
   live signal data (`sma55`/`sma21`/`bar_time` now logged per signal) and

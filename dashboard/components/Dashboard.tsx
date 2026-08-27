@@ -250,7 +250,7 @@ export default function Dashboard() {
           </div>
           <div>
             <div className="mb-1 font-mono text-xs" style={{ color: "var(--good)" }}>03 · MANAGE</div>
-            <b style={{ color: "var(--ink-primary)" }}>Risk gates &amp; exits.</b> ≤2% equity risk per
+            <b style={{ color: "var(--ink-primary)" }}>Risk gates &amp; exits.</b> ≤1.5% equity risk per
             position, liquidity screens on every chain. Close at 50% profit, stop at 2× credit,
             never carry past 2 DTE.
           </div>

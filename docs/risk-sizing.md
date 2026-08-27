@@ -34,7 +34,7 @@ more than the position count.
 |---|---|---|
 | Risk per position | 1–2% | 2% (`max_risk_per_position_pct`) |
 | Buying-power deployment | 25–50% | 50% cap; observed usage far lower |
-| Aggregate worst case | 15–25% | 20% (10 positions × 2%) |
+| Aggregate worst case | 15–25% | 19.5% (13 positions × 1.5%, retuned 2026-08-27 from 10 × 2% — same envelope, more and smaller positions) |
 | Profit taking | early, mechanical | 50% of credit / 2× stop / 2 DTE |
 
 Every parameter sits inside the experienced-practitioner band. The sizing is
