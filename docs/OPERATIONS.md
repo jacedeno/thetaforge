@@ -66,6 +66,20 @@ Every agent change, however small: tests → preflight → restart → watch one
 full monitor cycle in the log before walking away. "It's just a log line"
 was exactly the change that took the system down.
 
+## Operator reset, 2026-08-27 ~11:30 CT (sanctioned)
+
+Jose's call: the six positions opened under the retired 15-minute regime
+(COP, BA, CMG, JPM, NFLX, XOM) carried no informational value for the 5m
+burn-in and were consuming 6 of the 10 position slots — `max open
+positions` had already vetoed 14 signals that morning. All six were
+liquidated at the natural price (`tf-reset-*` client ids, `order_close`
+events carrying the reason, so journal, stats and the brain feed tell the
+story truthfully), together with two stuck close orders that were blocking
+BA and COP from monitor management (see the inverted-cost and exit-chase
+findings in FINDINGS.md). Realized cost of the reset: −$3,126 across the
+six. This is the sanctioned shape of an operator action: explicit ids,
+logged reasons, documented here — the opposite of a silent smoke test.
+
 ## Rule 5 — No manual orders on the live account
 
 The competition account's P&L is the judged artifact; one hand-typed order

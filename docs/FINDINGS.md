@@ -31,6 +31,17 @@
   (root, expiration, kind); two same-expiry spreads on one underlying merge
   and `avg_entry_price` averages their fills. Mitigated (journal credit is
   preferred; entry gates block the doubling); structural fix pending.
+- [ ] **Spread-level inverted-cost guard** — at the 2026-08-27 open BA's
+  legs quoted uncrossed individually but the SPREAD was inverted
+  (long mid > short mid → cost −1.15); `evaluate_exit` read it as a profit
+  target and parked an unfillable 0.02 close. Guard: `cost <= 0` means the
+  quotes are garbage → HOLD, never a profit target.
+- [ ] **Exit-order chase** — exits are exempt from stale cancels by design,
+  so an unfilled close limit rests forever while its position sits
+  unmanaged (COP's stop rested 3 h; the operator reset needed up to three
+  re-prices per spread to fill). Mirror the entry logic: an unfilled exit
+  older than ~2–3 min is cancelled and re-placed at the fresh natural —
+  the position must never be left without a working exit.
 
 ## Cosmetic / observability (any time)
 
