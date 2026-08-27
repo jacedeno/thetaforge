@@ -9,6 +9,7 @@ import PayoffDiagram from "./PayoffDiagram";
 import {
   sma, smaLookbackMs, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
 } from "@/lib/sma";
+import { toLocal, toLocalMs } from "@/lib/localtime";
 
 const TIMEFRAMES = ["5Min", "15Min", "1Hour", "1Day"] as const;
 const TF_LABEL: Record<string, string> = { "5Min": "5m", "15Min": "15m", "1Hour": "1h", "1Day": "1d" };
@@ -51,7 +52,9 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const [themeTick, setThemeTick] = useState(0);
-  const [tf, setTf] = useState("15Min");
+  // 5m by default — the signal's own timeframe, the one where the drawn
+  // SMAs reproduce what the agent computed.
+  const [tf, setTf] = useState("5Min");
 
   useEffect(() => {
     const mo = new MutationObserver(() => setThemeTick((t) => t + 1));
@@ -77,8 +80,10 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
 
     fetch(`/api/bars?symbol=${spread.underlying}&from=${from}&to=${to}&tf=${tf}`)
       .then((r) => r.json())
-      .then(({ bars }: { bars: CandlestickData<Time>[] }) => {
-        if (disposed || !bars?.length) return;
+      .then(({ bars: rawBars }: { bars: CandlestickData<Time>[] }) => {
+        if (disposed || !rawBars?.length) return;
+        // Shift bar times to the viewer's zone — the chart renders them as UTC.
+        const bars = rawBars.map((b) => ({ ...b, time: toLocal(b.time as number) }));
         const up = token("--good"), down = token("--critical");
         const chart = createChart(el, {
           height: 240,
@@ -128,10 +133,11 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
 
         // The entry marker — where the agent actually sold the spread.
         if (openMs != null) {
+          const openLocal = toLocalMs(openMs);
           let nearest = bars[0].time as number;
           for (const b of bars) {
-            if (Math.abs((b.time as number) * 1000 - openMs) <
-                Math.abs(nearest * 1000 - openMs)) nearest = b.time as number;
+            if (Math.abs((b.time as number) * 1000 - openLocal) <
+                Math.abs(nearest * 1000 - openLocal)) nearest = b.time as number;
           }
           import("lightweight-charts").then(({ createSeriesMarkers }) => {
             if (!disposed) createSeriesMarkers(series, [{

@@ -5,8 +5,8 @@ import type { CandlestickData, Time } from "lightweight-charts";
 // against the cross that fired it.
 export const SMA_FAST = 21;
 export const SMA_SLOW = 55;
-export const SMA_FAST_COLOR = "#ff9800"; // fast — orange
-export const SMA_SLOW_COLOR = "#e53935"; // slow — red
+export const SMA_FAST_COLOR = "#2196f3"; // fast — blue (Jose's convention)
+export const SMA_SLOW_COLOR = "#ff9800"; // slow — orange
 
 export function sma(
   bars: CandlestickData<Time>[], period: number,

@@ -9,6 +9,7 @@ import type { Trade } from "./TradeHistory";
 import {
   sma, smaLookbackMs, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
 } from "@/lib/sma";
+import { toLocal, toLocalMs } from "@/lib/localtime";
 
 const TIMEFRAMES = ["5Min", "15Min", "30Min", "1Hour", "1Day"] as const;
 const TF_LABEL: Record<string, string> = {
@@ -79,8 +80,12 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
 
     fetch(`/api/bars?symbol=${trade.underlying}&from=${from}&to=${to}&tf=${tf}`)
       .then((r) => r.json())
-      .then(({ bars }: { bars: CandlestickData<Time>[] }) => {
-        if (disposed || !bars?.length) return;
+      .then(({ bars: rawBars }: { bars: CandlestickData<Time>[] }) => {
+        if (disposed || !rawBars?.length) return;
+        // Shift bar times to the viewer's zone — the chart renders them as UTC.
+        const bars = rawBars.map((b) => ({ ...b, time: toLocal(b.time as number) }));
+        const openLocal = toLocalMs(openMs);
+        const closeLocal = toLocalMs(closeMs);
 
         const up = token("--good"), down = token("--critical");
         const chart = createChart(el, {
@@ -146,13 +151,13 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
           color: string; shape: "arrowUp" | "arrowDown"; text: string;
         }
         const markers: Marker[] = [{
-          time: nearest(openMs), position: "belowBar",
+          time: nearest(openLocal), position: "belowBar",
           color: token("--series-2"), shape: "arrowUp",
           text: `SELL ${trade.entry_credit.toFixed(2)}cr ×${trade.qty}`,
         }];
         if (trade.close_ts) {
           markers.push({
-            time: nearest(closeMs), position: "aboveBar",
+            time: nearest(closeLocal), position: "aboveBar",
             color: token("--series-1"), shape: "arrowDown",
             text: `CLOSE ${trade.exit_debit?.toFixed(2) ?? ""}db`,
           });
@@ -172,7 +177,7 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
           });
           return best;
         };
-        const iOpen = idx(openMs), iClose = idx(closeMs);
+        const iOpen = idx(openLocal), iClose = idx(closeLocal);
         if (iClose - iOpen < bars.length / 3) {
           const padBars = Math.max(12, (iClose - iOpen) * 2);
           chart.timeScale().setVisibleLogicalRange({
