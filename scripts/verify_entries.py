@@ -147,9 +147,11 @@ def main() -> None:
               f"c2 fresh cross: {'PASS' if c2 else 'FAIL'}   "
               f"c3 close>SMA21: {'PASS' if c3 else 'FAIL'}   "
               f"c4 bullish bar: {'PASS' if c4 else 'FAIL'}")
+        late = delay.total_seconds() > 600
         print(f"   event: price={sig_ev.get('price')} strength={ev_strength}"
               f"   signal->fill delay: {int(delay.total_seconds() // 60)}m"
-              f"{int(delay.total_seconds() % 60)}s")
+              f"{int(delay.total_seconds() % 60)}s"
+              f"{'   ** LATE_FILL — stale signal repriced, see OPERATIONS.md **' if late else ''}")
         if c1 and c2 and c3 and c4:
             print("   VERDICT: SIGNAL_CONFIRMED")
             ok += 1

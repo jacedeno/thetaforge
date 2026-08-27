@@ -149,7 +149,7 @@ def test_overextension_ceiling_and_calm_first():
         return Signal(symbol=sym, direction="LONG", close=100 * (1 + strength / 2),
                       sma_slow=100, sma_fast=100, bar_time=datetime(2026, 8, 26))
 
-    s_calm, s_mid, s_hot = sig("A", 0.001), sig("B", 0.006), sig("C", 0.020)
+    s_calm, s_mid, s_hot = sig("A", 0.001), sig("B", 0.006), sig("C", 0.030)
     ceiling = StrategyConfig().max_signal_strength
     kept = sorted([x for x in [s_hot, s_mid, s_calm] if x.strength <= ceiling],
                   key=lambda x: x.strength)

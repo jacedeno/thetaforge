@@ -96,7 +96,14 @@ and literature comparison live in [`risk-sizing.md`](risk-sizing.md).
 ## Open questions (resolve during dev-account testing, Aug 24–27)
 
 - [x] Multi-leg order mechanics validated 2026-08-24 — see `alpaca-notes.md` (rejection modes still pending)
-- [ ] Signal timeframe: 15m canonical vs 5m with confirmation
+- [x] Signal timeframe: resolved 2026-08-26 — 5m (V1-5m), scans every 5 minutes
+- [ ] `max_signal_strength` raised 0.012 → 0.02 for the 5m burn-in
+  (2026-08-27). Rationale: replay over the 80-name universe showed the 5m
+  trigger's median strength is ~0.003 with p95 ≈ 0.012, and the ceiling's
+  vetoes concentrate on opening-gap "crosses" (which 0.02 still blocks).
+  **Review after the burn-in with the live signal data** — every signal now
+  logs `sma55`/`sma21`/`bar_time`, and `scripts/verify_entries.py` audits
+  entries against them — then lock the value for competition week.
 - [ ] Iron condor leg: enable at launch, or ship directional-only MVP first
 - [ ] IV rank data source for the neutral branch
 

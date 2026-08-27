@@ -75,6 +75,20 @@ out-of-band order is ever unavoidable, keep its client_order_id outside the
 `tf-open-*` / `tf-retry-*` namespace so the journal tags it `manual` and the
 stats ignore it.
 
+## Scheduled for after the close, 2026-08-27 (burn-in finding)
+
+The stale-order reprice re-enters at the natural price **without
+re-validating the signal's age** — it checks only the credit floor and
+duplicate positions. Under a healthy monitor the stale→reprice chain lasts
+3–6 minutes and is tolerable; on 2026-08-26 the morning's restarts kept the
+monitor down, and its first healthy pass (12:52 CT) swept and repriced
+every accumulated stale order at once — COP, JPM and BA filled with signals
+up to **two hours old**, the day's worst entries. Fix, to ship after
+today's close through preflight: *a stale order older than ~10 minutes is
+cancelled without reprice* — its signal died with it. Until then the
+pattern is watched: `scripts/verify_entries.py` flags any signal→fill
+delay over 10 minutes as `LATE_FILL`.
+
 Known limitation (documented, not fixed): `reconstruct_spreads` pairs legs
 by (root, expiration, kind), so two same-expiry spreads on one underlying
 collapse into a single pair, and the broker's `avg_entry_price` averages

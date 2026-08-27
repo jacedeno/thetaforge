@@ -18,7 +18,12 @@ class StrategyConfig:
     min_dte: int = 7                       # minimum days to expiration at entry
     max_dte: int = 21                      # maximum days to expiration at entry
     max_new_positions_per_scan: int = 3    # calmest valid signals first
-    max_signal_strength: float = 0.012     # skip overextended breakouts — they mean-revert
+    # Skip overextended breakouts — they mean-revert. Raised 0.012 -> 0.02 on
+    # 2026-08-27 for the 5m burn-in: on 5-minute bars the median trigger
+    # strength is ~0.003 and the ceiling mostly vetoes opening-gap crosses,
+    # so one notch looser still blocks the violent gaps. UNDER REVIEW — decide
+    # with the live signal data (events now log sma55/sma21/bar_time).
+    max_signal_strength: float = 0.02
     max_new_per_sector_per_scan: int = 1   # one fresh bet per sector per scan
     order_stale_after_s: int = 180         # cancel unfilled entries after 3 minutes
     entry_concession_pct: float = 0.03     # shade the entry limit below mid to actually fill
