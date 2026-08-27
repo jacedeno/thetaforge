@@ -61,8 +61,13 @@ def run_scan(dry_run: bool = True) -> None:
                         reason=f"sector cap — already entering another {sector} name this scan")
             continue
         log.info("signal %s LONG @ %.2f strength=%.4f (bar %s)", sig.symbol, sig.close, sig.strength, sig.bar_time)
+        # sma55/sma21/bar_time make the entry auditable after the fact —
+        # live IEX bars settle late, so refetched history cannot reproduce
+        # the agent's rolling windows; its own numbers are the record.
         events.emit("signal", symbol=sig.symbol, direction="LONG", price=sig.close,
-                    strength=round(sig.strength, 4))
+                    strength=round(sig.strength, 4),
+                    sma55=round(sig.sma_slow, 4), sma21=round(sig.sma_fast, 4),
+                    bar_time=sig.bar_time.isoformat())
         spread = build_put_credit_spread(
             option_data, sig.symbol, sig.close, cfg.strategy, cfg.risk,
             oi_lookup=broker.option_open_interest,
