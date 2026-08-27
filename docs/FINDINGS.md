@@ -28,6 +28,15 @@
   `scripts/veto_summary.py`: veto counts by reason, especially "max open
   positions" and risk-budget rejections, and compare results before locking
   for competition week.
+- [ ] **`min_open_interest` 500 — is it the right floor?** Enforced for the
+  first time 2026-08-26 night (was documented but unimplemented). On
+  2026-08-27 it was the sole killer of CSCO (5 signals; only candidate's
+  legs at OI 319/277) and CAT (best credits of the day, 2.40–2.76 at
+  c/w 0.24–0.28, every leg at OI 49–116) while their QUOTES passed the
+  width gates. OI is a liquidity proxy; on $800 underlyings low OI with
+  tight quotes is normal. Review with data: lower the floor (~150–250)?
+  Or treat OI as secondary when the quote gates already pass? (DE stays
+  correctly vetoed either way — its chain quotes $2–7 wide with no bids.)
 - [ ] **`max_signal_strength` 0.02** — raised from 0.012 for the 5m burn-in
   (on 5m the ceiling mostly vetoes opening-gap crosses). Review with the
   live signal data (`sma55`/`sma21`/`bar_time` now logged per signal) and
