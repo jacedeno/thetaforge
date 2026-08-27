@@ -20,9 +20,15 @@
   after its bar. Decide: pay for real-time SIP · switch the signal to
   real-time IEX (thin bars — AAPL premarket had 1-trade candles) · accept
   the delay as part of the system.
-- [ ] **Pre-market trigger bars** — with the SIP delay, the day's first scans
-  evaluate pre-market bars (AAPL's 2026-08-27 trigger bar was 8:25 CT).
-  Decide whether the trigger requires regular-hours bars.
+- [x] **Pre-market bars in the signal** — SHIPPED 2026-08-27 night. The
+  finding turned out deeper than a preference: the 3,600-backtest sweep
+  that validated V1-5m runs on RTH-only bars (`ml30-sp500-strategy
+  data/alpaca_client.py`, "production / canonical"), while the live agent
+  fed extended-hours bars into the SMAs and even triggered on a pre-market
+  bar (AAPL). `fetch_bars` now filters to 09:30–16:00 ET — the live signal
+  is the validated signal again — and the dashboard computes its SMAs on
+  the same RTH-only tape (extended candles stay drawn, shaded, outside the
+  indicator).
 - [ ] **Sizing experiment 15 × 1.5%** — retuned 2026-08-27 midday from
   10 × 2% (first to 13, then 15 at Jose's call: 22.5% aggregate, upper half
   of the canonical band; the old cap had vetoed 14 signals that morning).
@@ -63,7 +69,8 @@
 
 - [ ] `run_scan.py` emits `universe=80` hardcoded — emit `len(symbols)`
   (the universe is 79 since BRK.B left).
-- [ ] `ml30.fetch_bars` docstring still says "15-minute bars" (code is 5-min).
+- [x] `ml30.fetch_bars` docstring said "15-minute bars" — fixed with the RTH
+  filter change.
 
 ## Post-competition
 

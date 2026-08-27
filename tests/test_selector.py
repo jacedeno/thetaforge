@@ -127,6 +127,23 @@ def test_build_rejects_crossed_short_quote():
     assert cand is None
 
 
+def test_rth_filter_drops_extended_hours_bars():
+    """The validated backtests are RTH-only — the live SMAs must be too.
+    Bar labels are window starts: 15:55 ET stays, 16:00 ET is after-hours."""
+    import pandas as pd
+
+    from agent.signals.ml30 import _rth
+
+    idx = pd.to_datetime([
+        "2026-08-27T13:25:00Z",  # 9:25 ET — pre-market, drop
+        "2026-08-27T13:30:00Z",  # 9:30 ET — first RTH bar, keep
+        "2026-08-27T19:55:00Z",  # 15:55 ET — last RTH bar, keep
+        "2026-08-27T20:00:00Z",  # 16:00 ET — after-hours, drop
+    ])
+    df = pd.DataFrame({"close": [1.0, 2.0, 3.0, 4.0]}, index=idx)
+    assert list(_rth(df)["close"]) == [2.0, 3.0]
+
+
 def test_parse_strike_dotted_root():
     """OCC symbols strip the class dot (BRK.B -> BRKB): slicing the ticker's
     own length crashed the scanner in a 65-second loop on 2026-08-27."""

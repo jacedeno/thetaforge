@@ -1,9 +1,9 @@
 """ML30 momentum signal engine.
 
-Triple-confirmation long trigger evaluated on 5-minute bars — the timeframe
-of V1-5m, the sweep-winning and live-validated variant of the system (its
-15-minute sibling was retired for lack of live edge). All four conditions
-on a single candle close:
+Triple-confirmation long trigger evaluated on 5-minute REGULAR-HOURS bars —
+the timeframe and session filter of V1-5m, the sweep-winning and
+live-validated variant of the system (its 15-minute sibling was retired for
+lack of live edge). All four conditions on a single candle close:
 
     c1: close > SMA55           (above primary moving average)
     c2: prev_close <= prev_SMA55  (fresh-cross filter: fires only on the
@@ -65,10 +65,24 @@ def load_sectors() -> dict[str, str]:
     return json.loads(_UNIVERSE_PATH.read_text()).get("sectors", {})
 
 
+def _rth(df: pd.DataFrame) -> pd.DataFrame:
+    """Regular-trading-hours bars only (09:30–16:00 ET, labels = window starts).
+
+    The 3,600-backtest sweep that validated V1-5m ran on RTH-only bars
+    (ml30-sp500-strategy data/alpaca_client.py — 'production / canonical');
+    the live signal must see the same tape. Pre/after-market bars are thin
+    and fed a live pre-market entry on 2026-08-27 that the validated system
+    could never have produced.
+    """
+    ny = df.index.tz_convert("America/New_York")
+    minutes = ny.hour * 60 + ny.minute
+    return df[(minutes >= 9 * 60 + 30) & (minutes < 16 * 60)]
+
+
 def fetch_bars(
     client: StockHistoricalDataClient, symbols: list[str], days: int = 4
 ) -> dict[str, pd.DataFrame]:
-    """Fetch recent 15-minute bars, keyed by symbol."""
+    """Fetch recent 5-minute regular-hours bars, keyed by symbol."""
     req = StockBarsRequest(
         symbol_or_symbols=symbols,
         timeframe=TimeFrame(5, TimeFrameUnit.Minute),
@@ -80,7 +94,7 @@ def fetch_bars(
     if df.empty:
         return out
     for symbol in df.index.get_level_values("symbol").unique():
-        out[symbol] = df.xs(symbol, level="symbol")
+        out[symbol] = _rth(df.xs(symbol, level="symbol"))
     return out
 
 

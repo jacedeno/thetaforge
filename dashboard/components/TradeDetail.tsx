@@ -128,15 +128,17 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
         });
         series.setData(bars);
 
-        // The signal's own averages, so the entry can be checked against the
-        // cross that fired it: fast orange, slow red.
+        // The signal's own averages, computed on REGULAR-HOURS bars only —
+        // exactly the tape the validated V1-5m signal sees. Extended-hours
+        // candles stay drawn (shaded) but never feed the indicator.
+        const smaBars = bars.filter((_, i) => !isExtendedHours(rawBars[i].time as number));
         for (const [period, color] of [
           [SMA_FAST, SMA_FAST_COLOR], [SMA_SLOW, SMA_SLOW_COLOR],
         ] as [number, string][]) {
           chart.addSeries(LineSeries, {
             color, lineWidth: 1, priceLineVisible: false,
             lastValueVisible: false, crosshairMarkerVisible: false,
-          }).setData(sma(bars, period));
+          }).setData(sma(smaBars, period));
         }
 
         // The options twist: strikes as price lines — the profit frontier is visible.
