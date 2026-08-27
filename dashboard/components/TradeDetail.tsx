@@ -7,7 +7,8 @@ import {
 } from "lightweight-charts";
 import type { Trade } from "./TradeHistory";
 import {
-  sma, smaLookbackMs, SIGNAL_COLOR, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
+  DEFAULT_RANGE_S, sma, smaLookbackMs,
+  SIGNAL_COLOR, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
 } from "@/lib/sma";
 import { toLocal, toLocalMs } from "@/lib/localtime";
 
@@ -67,11 +68,11 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
 
     const openMs = new Date(trade.open_ts).getTime();
     const closeMs = trade.close_ts ? new Date(trade.close_ts).getTime() : Date.now();
-    // Size the window to the trade: a minutes-long trade gets a session-scale
-    // view instead of the same fixed ±days a week-long trade needs.
-    const span = Math.max(closeMs - openMs, 60_000);
-    const pad = Math.max(span * 2, 3 * 3_600_000);
-    // Extra lookback so the SMAs are warm well before the entry marker.
+    // Fetch enough to cover the timeframe's default span around the trade
+    // (plus SMA warmup); the default VIEW is set after the data loads.
+    const tradeSpan = Math.max(closeMs - openMs, 60_000);
+    const rangeMs = (DEFAULT_RANGE_S[tf] ?? 72 * 3_600) * 1000;
+    const pad = Math.max(tradeSpan * 2, rangeMs);
     const from = new Date(openMs - pad - smaLookbackMs(tf)).toISOString();
     const to = new Date(Math.min(closeMs + pad, Date.now() - 16 * 60_000)).toISOString();
 
@@ -159,7 +160,7 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
           // Where the cross fired vs where the fill landed — the audit gap.
           markers.push({
             time: nearest(toLocalMs(Date.parse(trade.signal_ts))), position: "belowBar",
-            color: SIGNAL_COLOR, shape: "circle",
+            color: SIGNAL_COLOR, shape: "arrowUp",
             text: `SIGNAL${trade.signal_price != null ? ` ${trade.signal_price}` : ""}`,
           });
         }
@@ -175,27 +176,18 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
           if (!disposed) createSeriesMarkers(series, markers);
         });
 
-        // A logical (bar-index) range survives overnight/weekend session gaps
-        // that a time range would stretch across. Short trades get a window
-        // around their markers; long ones still fit everything.
-        const idx = (ms: number) => {
-          let best = 0;
-          bars.forEach((b, i) => {
-            if (Math.abs((b.time as number) * 1000 - ms) <
-                Math.abs((bars[best].time as number) * 1000 - ms)) best = i;
-          });
-          return best;
-        };
-        const iOpen = idx(openLocal), iClose = idx(closeLocal);
-        if (iClose - iOpen < bars.length / 3) {
-          const padBars = Math.max(12, (iClose - iOpen) * 2);
-          chart.timeScale().setVisibleLogicalRange({
-            from: Math.max(0, iOpen - padBars),
-            to: Math.min(bars.length - 1, iClose + padBars),
-          });
-        } else {
-          chart.timeScale().fitContent();
-        }
+        // Default view = the timeframe's span, anchored so the trade sits
+        // near the right; stretched when needed so no marker is cut off.
+        // Everything fetched beyond it stays available to zoom and pan into.
+        const spanS = DEFAULT_RANGE_S[tf] ?? 72 * 3_600;
+        const firstT = bars[0].time as number;
+        const lastT = bars[bars.length - 1].time as number;
+        const viewTo = Math.min(lastT, closeLocal / 1000 + spanS * 0.15);
+        let viewFrom = viewTo - spanS;
+        const sigLocal = trade.signal_ts
+          ? toLocalMs(Date.parse(trade.signal_ts)) / 1000 : openLocal / 1000;
+        viewFrom = Math.max(firstT, Math.min(viewFrom, sigLocal - spanS * 0.05));
+        chart.timeScale().setVisibleRange({ from: viewFrom as Time, to: viewTo as Time });
         const onResize = () => chart.applyOptions({ width: el.clientWidth });
         onResize();
         window.addEventListener("resize", onResize);

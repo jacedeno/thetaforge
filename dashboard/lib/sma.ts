@@ -7,7 +7,17 @@ export const SMA_FAST = 21;
 export const SMA_SLOW = 55;
 export const SMA_FAST_COLOR = "#2196f3"; // fast — blue (Jose's convention)
 export const SMA_SLOW_COLOR = "#ff9800"; // slow — orange
-export const SIGNAL_COLOR = "#e040fb";   // signal marker — distinct from both SMAs
+export const SIGNAL_COLOR = "#00e676";   // signal marker — traffic-light green: "go"
+
+// Default visible span per timeframe — a fast read at a glance, with zoom
+// and pan untouched. (Jose's spec: 5m→24h, 15m→72h, 1h→14d, 1d→12mo.)
+export const DEFAULT_RANGE_S: Record<string, number> = {
+  "5Min": 24 * 3600,
+  "15Min": 72 * 3600,
+  "30Min": 7 * 86400,
+  "1Hour": 14 * 86400,
+  "1Day": 365 * 86400,
+};
 
 export function sma(
   bars: CandlestickData<Time>[], period: number,

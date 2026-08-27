@@ -7,7 +7,8 @@ import {
 } from "lightweight-charts";
 import PayoffDiagram from "./PayoffDiagram";
 import {
-  sma, smaLookbackMs, SIGNAL_COLOR, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
+  DEFAULT_RANGE_S, sma, smaLookbackMs,
+  SIGNAL_COLOR, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
 } from "@/lib/sma";
 import { toLocal, toLocalMs } from "@/lib/localtime";
 
@@ -69,10 +70,11 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
     const el = ref.current;
     const to = new Date(Date.now() - 16 * 60_000).toISOString();
     const openMs = spread.openTs ? new Date(spread.openTs).getTime() : null;
-    // 7 days of context — stretched back to the entry when it's older — plus
-    // enough lookback for SMA55 to be warm on screen.
+    const spanMs = (DEFAULT_RANGE_S[tf] ?? 7 * 86_400) * 1000;
+    // Fetch the default span — stretched back to the entry when it's older —
+    // plus enough lookback for SMA55 to be warm on screen.
     const windowStart = Math.min(
-      Date.now() - 7 * 86_400_000,
+      Date.now() - spanMs,
       openMs != null ? openMs - 86_400_000 : Infinity,
     );
     const from = new Date(windowStart - smaLookbackMs(tf)).toISOString();
@@ -151,7 +153,7 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
         if (spread.signalTs) {
           markers.push({
             time: nearest(toLocalMs(Date.parse(spread.signalTs))), position: "belowBar",
-            color: SIGNAL_COLOR, shape: "circle",
+            color: SIGNAL_COLOR, shape: "arrowUp",
             text: `SIGNAL${spread.signalPrice != null ? ` ${spread.signalPrice}` : ""}`,
           });
         }
@@ -168,7 +170,13 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
             if (!disposed) createSeriesMarkers(series, markers);
           });
         }
-        chart.timeScale().fitContent();
+        // Default view = the timeframe's span, ending at the latest bar;
+        // the extra fetched history stays available to zoom and pan into.
+        const lastT = bars[bars.length - 1].time as number;
+        chart.timeScale().setVisibleRange({
+          from: Math.max(bars[0].time as number, lastT - (DEFAULT_RANGE_S[tf] ?? 7 * 86_400)) as Time,
+          to: lastT as Time,
+        });
         const onResize = () => chart.applyOptions({ width: el.clientWidth });
         onResize();
         window.addEventListener("resize", onResize);
