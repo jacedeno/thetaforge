@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
+import { findSignal, loadEvents } from "@/lib/signals";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +13,23 @@ export async function GET() {
     interface TradeRow {
       status: string; realized_pl: number | null;
       entry_credit: number; exit_debit: number | null; qty: number;
+      underlying: string; short_symbol: string; open_ts: string;
       source?: string;
+      signal_ts?: string | null; signal_price?: number | null;
       [k: string]: unknown;
     }
     const trades = db.prepare(
       "SELECT * FROM trades ORDER BY open_ts DESC LIMIT 200",
     ).all() as TradeRow[];
     db.close();
+
+    // The signal bar behind each trade, for the chart's SIGNAL marker.
+    const evts = await loadEvents();
+    for (const t of trades) {
+      const sig = findSignal(evts, t.underlying, t.short_symbol, t.open_ts);
+      t.signal_ts = sig ? (sig.barTime ?? sig.ts) : null;
+      t.signal_price = sig?.price ?? null;
+    }
 
     // Manual/out-of-band orders stay visible in the list (badged) but never
     // count toward the agent's performance stats.

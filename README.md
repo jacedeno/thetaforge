@@ -30,6 +30,29 @@ dashboard/   Next.js dashboard: live positions, P&L, Greeks, trade log
 - **Agent:** Python 3.13 · alpaca-py
 - **Dashboard:** Next.js · shadcn/ui · ECharts · lightweight-charts
 
+## Dashboard
+
+The dashboard is the agent's public window — and its **audit instrument**. Every
+element exists so the strategy can be inspected and adjusted between sessions:
+
+- Candle charts drawn with the signal's own moving averages (SMA21 blue,
+  SMA55 orange, the exact parameters the trigger uses), in the viewer's timezone.
+- A **SIGNAL** marker on the bar where the trigger fired and a **SELL** marker
+  where the position actually filled — the gap between them is the execution
+  audit (signal→fill latency is a tracked metric).
+- Expanded positions show the full payoff curve with breakeven, take-profit and
+  stop levels, the live spot on the curve, and entry details from the journal.
+- Trade history comes straight from the SQLite journal, with provenance: orders
+  not placed by the agent are badged `manual` and excluded from performance stats.
+- The "agent brain" feed narrates every scan, signal, veto and order in plain
+  language, from the same event log the agent writes.
+
+For the competition the dashboard is strictly **read-only visualization**: API
+keys live server-side only and the page exposes no controls. The natural next
+step is closing the loop — introducing strategy variables (delta band, credit
+floors, exit thresholds) from the dashboard itself, gated behind the same
+preflight discipline that already guards every agent start.
+
 ## Risk management
 
 - Defined-risk structures only — no naked short options, ever

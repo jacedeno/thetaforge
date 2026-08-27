@@ -7,7 +7,7 @@ import {
 } from "lightweight-charts";
 import type { Trade } from "./TradeHistory";
 import {
-  sma, smaLookbackMs, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
+  sma, smaLookbackMs, SIGNAL_COLOR, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
 } from "@/lib/sma";
 import { toLocal, toLocalMs } from "@/lib/localtime";
 
@@ -148,13 +148,21 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
         };
         interface Marker {
           time: Time; position: "belowBar" | "aboveBar";
-          color: string; shape: "arrowUp" | "arrowDown"; text: string;
+          color: string; shape: "arrowUp" | "arrowDown" | "circle"; text: string;
         }
         const markers: Marker[] = [{
           time: nearest(openLocal), position: "belowBar",
           color: token("--series-2"), shape: "arrowUp",
           text: `SELL ${trade.entry_credit.toFixed(2)}cr ×${trade.qty}`,
         }];
+        if (trade.signal_ts) {
+          // Where the cross fired vs where the fill landed — the audit gap.
+          markers.push({
+            time: nearest(toLocalMs(Date.parse(trade.signal_ts))), position: "belowBar",
+            color: SIGNAL_COLOR, shape: "circle",
+            text: `SIGNAL${trade.signal_price != null ? ` ${trade.signal_price}` : ""}`,
+          });
+        }
         if (trade.close_ts) {
           markers.push({
             time: nearest(closeLocal), position: "aboveBar",
@@ -162,6 +170,7 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
             text: `CLOSE ${trade.exit_debit?.toFixed(2) ?? ""}db`,
           });
         }
+        markers.sort((a, b) => (a.time as number) - (b.time as number));
         import("lightweight-charts").then(({ createSeriesMarkers }) => {
           if (!disposed) createSeriesMarkers(series, markers);
         });
@@ -205,7 +214,8 @@ export default function TradeDetail({ trade }: { trade: Trade }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trade.open_order_id, trade.open_ts, trade.close_ts, trade.underlying,
       trade.short_strike, trade.long_strike, trade.entry_credit,
-      trade.exit_debit, trade.qty, themeTick, tf]);
+      trade.exit_debit, trade.qty, trade.signal_ts, trade.signal_price,
+      themeTick, tf]);
 
   const quickFlip = trade.close_ts != null && holdingMs < 15 * 60_000;
   const holding = trade.close_ts ? formatHolding(holdingMs) : "open";

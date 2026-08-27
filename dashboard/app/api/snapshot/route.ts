@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { alpaca, parseOcc } from "@/lib/alpaca";
+import { findSignal, loadEvents } from "@/lib/signals";
 
 /** Fill-derived entry credits for open trades, keyed "short|long".
  *  The journal is the single source of truth for entry_credit — the
@@ -87,6 +88,8 @@ interface Spread {
   qty: number;
   entryCredit: number;
   openTs: string | null;     // from the journal — the broker position has no timestamp
+  signalTs: string | null;   // the signal bar behind this trade, from the event log
+  signalPrice: number | null;
   currentCost: number;
   unrealizedPl: number;      // broker mark — can lag the live quote in thin chains
   midCost: number | null;    // cost to close at the mid — where you'd actually trade
@@ -128,6 +131,8 @@ function reconstructSpreads(positions: RawPosition[], journal: Map<string, Journ
       qty,
       entryCredit: +entryCredit.toFixed(2),
       openTs: j?.openTs ?? null,
+      signalTs: null,
+      signalPrice: null,
       currentCost: +currentCost.toFixed(2),
       unrealizedPl: +(parseFloat(sp.unrealized_pl) + parseFloat(lp.unrealized_pl)).toFixed(2),
       midCost: null,
@@ -154,6 +159,13 @@ export async function GET() {
 
     const optionPositions = positionsRaw.filter((p) => p.asset_class === "us_option");
     const spreads = reconstructSpreads(optionPositions, journalOpenTrades());
+    const evts = await loadEvents();
+    for (const s of spreads) {
+      if (!s.openTs) continue;
+      const sig = findSignal(evts, s.underlying, s.shortSymbol, s.openTs);
+      s.signalTs = sig ? (sig.barTime ?? sig.ts) : null;
+      s.signalPrice = sig?.price ?? null;
+    }
     const spots = await latestSpots([...new Set(spreads.map((s) => s.underlying))]);
     const optQuotes = await latestOptionQuotes(
       spreads.flatMap((s) => [s.shortSymbol, s.longSymbol]),

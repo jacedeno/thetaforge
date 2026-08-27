@@ -7,7 +7,7 @@ import {
 } from "lightweight-charts";
 import PayoffDiagram from "./PayoffDiagram";
 import {
-  sma, smaLookbackMs, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
+  sma, smaLookbackMs, SIGNAL_COLOR, SMA_FAST, SMA_SLOW, SMA_FAST_COLOR, SMA_SLOW_COLOR,
 } from "@/lib/sma";
 import { toLocal, toLocalMs } from "@/lib/localtime";
 
@@ -22,6 +22,8 @@ export interface OpenSpread {
   qty: number;
   entryCredit: number;
   openTs?: string | null;
+  signalTs?: string | null;
+  signalPrice?: number | null;
   midCost: number | null;
   midPl: number | null;
   unrealizedPl: number;
@@ -131,20 +133,39 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
           lineWidth: 1, lineStyle: 3, title: "breakeven",
         });
 
-        // The entry marker — where the agent actually sold the spread.
-        if (openMs != null) {
-          const openLocal = toLocalMs(openMs);
-          let nearest = bars[0].time as number;
+        // Markers: where the signal fired, and where the agent actually
+        // filled — the gap between them is the audit.
+        const nearest = (ms: number) => {
+          let best = bars[0].time as number;
           for (const b of bars) {
-            if (Math.abs((b.time as number) * 1000 - openLocal) <
-                Math.abs(nearest * 1000 - openLocal)) nearest = b.time as number;
+            if (Math.abs((b.time as number) * 1000 - ms) <
+                Math.abs(best * 1000 - ms)) best = b.time as number;
           }
+          return best as Time;
+        };
+        interface Marker {
+          time: Time; position: "belowBar" | "aboveBar";
+          color: string; shape: "arrowUp" | "circle"; text: string;
+        }
+        const markers: Marker[] = [];
+        if (spread.signalTs) {
+          markers.push({
+            time: nearest(toLocalMs(Date.parse(spread.signalTs))), position: "belowBar",
+            color: SIGNAL_COLOR, shape: "circle",
+            text: `SIGNAL${spread.signalPrice != null ? ` ${spread.signalPrice}` : ""}`,
+          });
+        }
+        if (openMs != null) {
+          markers.push({
+            time: nearest(toLocalMs(openMs)), position: "belowBar",
+            color: token("--series-2"), shape: "arrowUp",
+            text: `SELL ${spread.entryCredit.toFixed(2)}cr ×${spread.qty}`,
+          });
+        }
+        if (markers.length) {
+          markers.sort((a, b) => (a.time as number) - (b.time as number));
           import("lightweight-charts").then(({ createSeriesMarkers }) => {
-            if (!disposed) createSeriesMarkers(series, [{
-              time: nearest as Time, position: "belowBar",
-              color: token("--series-2"), shape: "arrowUp",
-              text: `SELL ${spread.entryCredit.toFixed(2)}cr ×${spread.qty}`,
-            }]);
+            if (!disposed) createSeriesMarkers(series, markers);
           });
         }
         chart.timeScale().fitContent();
@@ -161,7 +182,7 @@ export default function PositionDetail({ spread, spot }: { spread: OpenSpread; s
       chartRef.current = null;
     };
   }, [spread.underlying, spread.shortStrike, spread.longStrike, spread.entryCredit,
-      spread.openTs, spread.qty, themeTick, tf]);
+      spread.openTs, spread.signalTs, spread.signalPrice, spread.qty, themeTick, tf]);
 
   const width = spread.shortStrike - spread.longStrike;
   const maxProfit = spread.entryCredit * 100 * spread.qty;

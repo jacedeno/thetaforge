@@ -20,6 +20,8 @@ interface Spread {
   qty: number;
   entryCredit: number;
   openTs: string | null;
+  signalTs: string | null;
+  signalPrice: number | null;
   currentCost: number;
   unrealizedPl: number;
   midCost: number | null;

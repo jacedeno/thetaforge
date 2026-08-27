@@ -21,6 +21,8 @@ export interface Trade {
   signal_strength: number | null;
   status: string;
   source?: string;   // 'agent' | 'manual' — manual rows are badged and excluded from stats
+  signal_ts?: string | null;    // the signal bar behind the trade, from the event log
+  signal_price?: number | null;
 }
 
 interface Stats {

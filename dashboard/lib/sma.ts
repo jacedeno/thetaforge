@@ -7,6 +7,7 @@ export const SMA_FAST = 21;
 export const SMA_SLOW = 55;
 export const SMA_FAST_COLOR = "#2196f3"; // fast — blue (Jose's convention)
 export const SMA_SLOW_COLOR = "#ff9800"; // slow — orange
+export const SIGNAL_COLOR = "#e040fb";   // signal marker — distinct from both SMAs
 
 export function sma(
   bars: CandlestickData<Time>[], period: number,
