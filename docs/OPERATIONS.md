@@ -91,15 +91,22 @@ heartbeat). Detection no longer depends on a human noticing odd behavior.
 - Optional: social prize (2 × $500) for build-in-public posts on X/LinkedIn
   tagging @lablabai and @AlpacaHQ — up to 5 post links with the submission.
 
-**EXECUTED 2026-08-28 ~12:00 CT.** Jose created the dedicated $100k paper
-account after the kickoff (options level 3 verified via the API before
-touching anything); keys swapped into both envs, preflight PASS (61 tests
-+ smoke), fresh journal/logs (burn-in artifacts archived under
-`archive/burnin-account-*/`, including that account's keys — it was left
-holding 12 open paper spreads, unmanaged from here on), loop and dashboard
-restarted as a single tree, first scan + monitor cycle watched clean.
-Keys registered in the credentials store. The account ID lives in the
-submission and the credentials store only — never in this public repo.
+**EXECUTED TWICE 2026-08-28 — the second one is final.**
+- ~12:00 CT: swapped to a fresh $100k account right after the kickoff.
+  The official FAQ (published that afternoon) then fixed the scoring
+  window to Monday 9:30 ET, so that account became a sanctioned full-day
+  live test (8 spreads opened; archived as `archive/testday-account-*/`,
+  positions abandoned, keys in its `env-*.bak`).
+- ~15:15 CT, market closed: swapped to the OFFICIAL competition account —
+  same procedure both times: account verified via the API first ($100k
+  exact, options level 3, ACTIVE), keys into both envs, preflight PASS
+  (61 tests + smoke), fresh journal/logs, single-tree restart, dashboard
+  re-serving the new account. The loop now no-ops through the weekend on
+  the clock guard and places its first order Monday 9:30 ET — inside the
+  official window, untouched $100k, by construction rather than by timing
+  discipline. Keys registered in the credentials store. Account IDs live
+  in the submission and the credentials store only — never in this
+  public repo.
 
 1. Read the released conditions FIRST — account requirements, judged
    window, capital. Only then create/reset the competition paper account.
