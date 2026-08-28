@@ -14,22 +14,22 @@ liquid S&P 500 names. The learning happened at design time: the sweep decided
 *which* rule carries edge; the agent executes that rule.
 
 **2. The execution layer (deterministic, online).** The running agent is
-deterministic Python: scan the 80 most liquid S&P 500 names on each 15-minute
-close, rank fresh momentum crosses by breakout strength, express the strongest
-through ~25-delta put credit spreads (7–21 DTE), and manage exits
-mechanically. Same input, same decision, every time — no hallucination risk
+deterministic Python: scan the 80 most liquid S&P 500 names on each 5-minute
+close, take fresh momentum crosses that haven't already overextended (calmest
+first), express them through ~25-delta put credit spreads (7–21 DTE), and
+manage exits mechanically. Same input, same decision, every time — no hallucination risk
 with live orders, millisecond latency, and every trade auditable down to the
 four boolean conditions that triggered it.
 
-**3. The operator layer (LLM, supervisory).** An AI operator (Claude,
-connected through Alpaca's MCP server) built the system, watches it trade,
-diagnoses failures from the structured event log, and ships fixes — during the
-test week it caught and fixed live: a fill-rate collapse from mid-anchored
-pricing, a stale-order detector defeated by SDK enum stringification, a
-scheduler that skipped scans, and a duplicate-position race.
+**3. The operator layer (LLM, supervisory).** An LLM operator, connected
+through Alpaca's MCP server, supervises the running system: it watches it
+trade, diagnoses failures from the structured event log, and ships fixes —
+during the test week it caught and fixed live: a fill-rate collapse from
+mid-anchored pricing, a stale-order detector defeated by SDK enum
+stringification, a scheduler that skipped scans, and a duplicate-position race.
 
 The thesis: **an LLM inside the order loop adds variance exactly where
-reliability is non-negotiable.** AI designs, supervises and adapts; determinism
+reliability is non-negotiable.** AI supervises and adapts; determinism
 executes. The public "agent brain" feed narrates the deterministic decisions
 in plain language — the intelligence is in the rules, the narration is
 courtesy for the viewer.
@@ -49,17 +49,17 @@ or falls short of ~3–4%.
 
 | Gate | Rule |
 |---|---|
-| Position risk | max loss (width − credit) ≤ **2% of equity** |
-| Portfolio | ≤ 10 concurrent positions · ≤ 50% buying power · 1 per underlying |
+| Position risk | max loss (width − credit) ≤ **1.5% of equity** |
+| Portfolio | ≤ 15 concurrent positions · ≤ 50% buying power · 1 per underlying |
 | In-flight claim | a pending order reserves its underlying — no stacking |
 | Entry quality | short-leg delta 0.15–0.32 · credit ≥ 12% of width · ≥ $0.15 |
 | Chain liquidity | per-leg bid-ask tight in relative (≤25%) *or* absolute (≤$0.10) terms |
-| Cadence | ≤ 3 new positions per scan, strongest signals first |
+| Cadence | ≤ 3 new positions per scan · ≤ 1 per sector per scan, calmest signals first |
 | Exits | 50% of credit → take profit · 2× credit loss → stop · ≤ 2 DTE → close, never carry to expiration |
 | Order hygiene | unfilled entries cancelled at 3 min; one reprice at the market's natural price, never chase further |
 
 Sizing sits inside the canonical band for short-premium systems (1–2% per
-position, fractional-Kelly territory; aggregate worst case 20%).
+position, fractional-Kelly territory; aggregate worst case 22.5%).
 
 ## Alpaca infrastructure
 
