@@ -63,6 +63,20 @@ heartbeat). Detection no longer depends on a human noticing odd behavior.
 ## Account swap checklist (competition start — after the kickoff, per the
 ## Discord moderators: "start after kick off", confirmed 2026-08-27)
 
+**Official conditions (kickoff email, lablab.ai, 2026-08-28):**
+- Final submission must run on a **brand-new paper account created for the
+  hackathon** — an existing or reused account is not eligible for judging.
+- Starting balance **set to $100,000**. Create it as soon as possible so the
+  trading history is clean from minute one.
+- The **paper account ID goes in the submission** — that is how judges read
+  the P&L. One-page write-up required (AI logic, risk gates, Alpaca infra)
+  — `docs/WRITEUP.md` covers exactly this.
+- Requirements confirmed: autonomous agent on the Trading API, must use the
+  MCP server or CLI (we use both), strategy must incorporate options. Main
+  track: "Options Alpha Agents" — P&L over the competition window.
+- Optional: social prize (2 × $500) for build-in-public posts on X/LinkedIn
+  tagging @lablabai and @AlpacaHQ — up to 5 post links with the submission.
+
 1. Read the released conditions FIRST — account requirements, judged
    window, capital. Only then create/reset the competition paper account.
 2. New keys into `.env` (agent) and `dashboard/.env.local` (dashboard).
