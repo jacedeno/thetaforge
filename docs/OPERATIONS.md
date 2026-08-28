@@ -63,6 +63,20 @@ heartbeat). Detection no longer depends on a human noticing odd behavior.
 ## Account swap checklist (competition start — after the kickoff, per the
 ## Discord moderators: "start after kick off", confirmed 2026-08-27)
 
+**Official FAQ (Alpaca/lablab Google Doc, published 2026-08-28 afternoon):**
+- **Official P&L window: Mon Aug 31 9:30 ET → Fri Sep 4 9:30 ET.** The
+  agent "should begin trading from this account on Monday, August 31 at
+  9:30 a.m. ET"; judges snapshot **total equity** (not cash) at the close.
+- Consequence: the account swapped in on Friday noon traded pre-window
+  (2 spreads) — Jose's call: let it run as a full-day live test, create
+  the FINAL competition account after Friday's close, swap with the market
+  closed, and let the clock guard deliver the first trade Monday 9:30 ET.
+- **UI not required** (dashboard is scoring upside, not a requirement).
+- **Free market data explicitly permitted** (indicative options feed);
+  Algo Trader Plus/OPRA allowed but not provided.
+- P&L "an important factor, but winners will not be selected on P&L
+  alone" — creativity, autonomy, robustness of the workflow are judged.
+
 **Official conditions (kickoff email, lablab.ai, 2026-08-28):**
 - Final submission must run on a **brand-new paper account created for the
   hackathon** — an existing or reused account is not eligible for judging.

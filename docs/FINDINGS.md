@@ -15,11 +15,11 @@
   the universe for the competition** (Jose's call to re-add — its option
   chain is thin and would likely veto anyway; dashboard spot lookup for
   dotted roots is untested).
-- [ ] **Data feed decision** — the agent's bars are free-plan SIP: complete,
-  but minus the last 15 minutes, so every "5-minute" signal fires 15–20 min
-  after its bar. Decide: pay for real-time SIP · switch the signal to
-  real-time IEX (thin bars — AAPL premarket had 1-trade candles) · accept
-  the delay as part of the system.
+- [x] **Data feed decision** — RESOLVED 2026-08-28 by the official FAQ:
+  the free tier (delayed SIP bars, indicative options feed) is explicitly
+  permitted for the competition; paid tiers allowed but not provided. We
+  stay on the free plan — the 15-min delay is an accepted property of the
+  system (documented in the write-up's honesty about entry timing).
 - [x] **Pre-market bars in the signal** — SHIPPED 2026-08-27 night. The
   finding turned out deeper than a preference: the 3,600-backtest sweep
   that validated V1-5m runs on RTH-only bars (`ml30-sp500-strategy
