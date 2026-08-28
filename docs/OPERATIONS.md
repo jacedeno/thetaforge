@@ -77,6 +77,16 @@ heartbeat). Detection no longer depends on a human noticing odd behavior.
 - Optional: social prize (2 × $500) for build-in-public posts on X/LinkedIn
   tagging @lablabai and @AlpacaHQ — up to 5 post links with the submission.
 
+**EXECUTED 2026-08-28 ~12:00 CT.** Jose created the dedicated $100k paper
+account after the kickoff (options level 3 verified via the API before
+touching anything); keys swapped into both envs, preflight PASS (61 tests
++ smoke), fresh journal/logs (burn-in artifacts archived under
+`archive/burnin-account-*/`, including that account's keys — it was left
+holding 12 open paper spreads, unmanaged from here on), loop and dashboard
+restarted as a single tree, first scan + monitor cycle watched clean.
+Keys registered in the credentials store. The account ID lives in the
+submission and the credentials store only — never in this public repo.
+
 1. Read the released conditions FIRST — account requirements, judged
    window, capital. Only then create/reset the competition paper account.
 2. New keys into `.env` (agent) and `dashboard/.env.local` (dashboard).
