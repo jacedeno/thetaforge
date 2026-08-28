@@ -49,6 +49,23 @@
   (on 5m the ceiling mostly vetoes opening-gap crosses). Review with the
   live signal data (`sma55`/`sma21`/`bar_time` now logged per signal) and
   lock the value for competition week.
+- [ ] **Chain symbols that fail to parse must be skipped, not fatal** —
+  2026-08-28 kickoff-day incident: SPGI's chain carries corporate-action
+  adjusted contracts under the suffixed root `SPGI1`; `parse_strike` read
+  the `1` as a date digit and the ValueError killed the whole scan
+  iteration (monitor pass included) every time SPGI signaled. Contained by
+  removing SPGI from the universe (78 names). Fix: `_trace_candidates`
+  skips symbols that don't parse as `root+YYMMDD[C/P]strike` (adjusted
+  roots are never candidates), regression test with an `SPGI1` symbol in
+  the fixture chain; then SPGI (and the same argument for BRK.B) can
+  return. Details: OPERATIONS.md.
+- [ ] **First ~20 min of the day trade yesterday's close bar** — with the
+  RTH filter plus the 15-min SIP delay, scans from 8:30 to ~8:50 CT see
+  yesterday's 14:55 CT bar as "latest" and fire its signals (6 on
+  2026-08-28, all vetoed by open-hour option liquidity — protection by
+  luck, not by design). Consider a max signal-bar age (e.g. ignore bars
+  older than 30 min) so overnight-gap entries can't slip through on a
+  quiet open.
 - [ ] **Selector hardening, deferred half** — delta-vs-price plausibility
   check and short-leg minimum bid (deliberately not shipped 2026-08-26).
 - [ ] **Same-expiry spread collapse** — `reconstruct_spreads` keys legs by

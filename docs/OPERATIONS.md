@@ -132,6 +132,24 @@ in the 2026-08-26 universe expansion and fired its first signal today),
 restart through preflight, clean single scan on the next slot. Code fix
 scheduled below.
 
+## Kickoff-day incident, 2026-08-28 08:45 CT — SPGI adjusted-contract crash
+
+Same class as BRK.B, new variant: SPGI's option chain carries
+corporate-action-adjusted contracts under a **numeric-suffixed root**
+(`SPGI1...`), so `parse_strike` — which slices `len(occ_root("SPGI"))`
+characters — read the adjusted root's `1` as the first digit of the date
+and died on `ValueError: month must be in 1..12, not 60`. Every scan where
+SPGI signaled aborted the whole iteration (4 crashes 08:45–08:49, ~65 s
+retry cadence, monitor pass skipped each time; one more at 09:01).
+Contained at parameter level 09:04 CT during the morning audit: SPGI
+removed from `universe.json` (78 symbols — hot-reloaded, `load_universe()`
+runs per scan, no restart needed). Next scan 09:05:42 clean. Code fix for
+after the close: the candidate loop must *skip* chain symbols that fail to
+parse (adjusted roots are never tradable candidates for us) instead of
+letting one bad symbol kill the scan — with a regression test; SPGI
+returns to the universe only after that lands, and BRK.B's `occ_root` fix
+alone was not sufficient because it never anticipated suffixed roots.
+
 > The actionable checklist distilled from these findings lives in
 > [`FINDINGS.md`](FINDINGS.md) — work through it there.
 
