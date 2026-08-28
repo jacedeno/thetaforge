@@ -45,6 +45,19 @@ plain systematic premium selling — a documented, survivable floor. Win-rate
 asymmetry does the rest: spreads profit if the underlying rises, stays flat,
 or falls short of ~3–4%.
 
+## An honest note on the scoring window
+
+This strategy's edge is structural, not fast. Put credit spreads earn the
+volatility risk premium over their 7–21 day life, and the win-rate asymmetry
+needs tens of trades to express itself. A four-day equity snapshot samples
+that process mid-flight: most positions will still be open at the closing
+bell, marked at current quotes rather than at their expected value, so
+short-window P&L is dominated by noise the system was never designed to
+chase. We compete inside the window as it is — but the honest claim is that
+this architecture is built to win over months, and what four days *can*
+fairly judge is the part that doesn't need luck: autonomy, risk discipline,
+and a fully auditable decision trail.
+
 ## Risk gates — every order passes all, one veto kills it
 
 | Gate | Rule |
