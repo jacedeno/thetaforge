@@ -68,6 +68,18 @@ uv sync
 uv run python -m agent.main
 ```
 
+## Pre-event work disclosure
+
+Per the hackathon FAQ, pre-event work must be disclosed: this repository was
+created and developed in the days before the August 28 kickoff — the git
+history is public and tells the story commit by commit. Prototyping and a
+burn-in week ran on separate testing paper accounts, as the rules permit.
+Official competition trading happens exclusively in the dedicated $100,000
+paper account, which placed its first order inside the official scoring
+window (Monday, August 31, 9:30 a.m. ET onward). The underlying momentum
+rule comes from the author's prior backtesting research; the agent, its
+options workflow, risk gates, journal and dashboard are the work submitted.
+
 ## Disclaimer
 
 This project trades exclusively in Alpaca's **paper trading environment** with simulated funds. Nothing here is financial advice.

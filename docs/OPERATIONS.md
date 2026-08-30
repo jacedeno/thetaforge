@@ -63,6 +63,22 @@ heartbeat). Detection no longer depends on a human noticing odd behavior.
 ## Account swap checklist (competition start — after the kickoff, per the
 ## Discord moderators: "start after kick off", confirmed 2026-08-27)
 
+**FAQ update caught 2026-08-30 (re-read of the Google Doc):**
+- **The judged number is total equity as of EOD Thursday, Sep 3** — stated
+  twice ("we will be looking at the portfolio's total equity as of EOD
+  Thursday Sep 3rd"), even though the window formally ends Friday 9:30 ET.
+  Operator plan: have the book in its best shape by Thursday's close, and
+  consider closing positions Thursday afternoon so the judged equity is
+  cash, not end-of-day option marks (closing quotes mark pessimistically).
+- **Pre-event work must be disclosed** in the README/submission — done,
+  see README "Pre-event work disclosure".
+- Also confirmed: no scoreboard · no risk-adjusted metrics (raw total
+  equity) · backtests/simulated shocks welcome in the write-up as guardrail
+  evidence · repo may stay private (ours is public by choice) · no strategy
+  or model-provider restrictions · free-plan option QUOTES are real-time
+  (the 15-min restriction is historical bars/trades only) · hosting not
+  required.
+
 **Official FAQ (Alpaca/lablab Google Doc, published 2026-08-28 afternoon):**
 - **Official P&L window: Mon Aug 31 9:30 ET → Fri Sep 4 9:30 ET.** The
   agent "should begin trading from this account on Monday, August 31 at
