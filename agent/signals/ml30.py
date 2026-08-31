@@ -31,6 +31,7 @@ from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 SMA_SLOW = 55
 SMA_FAST = 21
 BARS_NEEDED = SMA_SLOW + 5  # warm-up plus a small margin
+BAR_SPAN_S = 5 * 60         # bar labels are window STARTS; close = label + span
 
 _UNIVERSE_PATH = Path(__file__).resolve().parent.parent / "universe.json"
 
@@ -122,6 +123,32 @@ def evaluate(symbol: str, df: pd.DataFrame) -> Signal | None:
             bar_time=df.index[c].to_pydatetime(),
         )
     return None
+
+
+def bar_age_s(bar_time: datetime, now: datetime | None = None) -> float:
+    """Seconds since the signal bar CLOSED (labels are window starts)."""
+    now = now or datetime.now(timezone.utc)
+    return (now - (bar_time + timedelta(seconds=BAR_SPAN_S))).total_seconds()
+
+
+def split_stale(
+    signals: list[Signal], max_age_s: float, now: datetime | None = None
+) -> tuple[list[Signal], list[tuple[Signal, float]]]:
+    """Split signals into fresh and stale by bar age; stale carries its age.
+
+    A stale bar is treated exactly like a down feed — the API answering with
+    old data is the more expensive failure, because nothing errors.
+    """
+    now = now or datetime.now(timezone.utc)
+    fresh: list[Signal] = []
+    stale: list[tuple[Signal, float]] = []
+    for s in signals:
+        age = bar_age_s(s.bar_time, now)
+        if age <= max_age_s:
+            fresh.append(s)
+        else:
+            stale.append((s, age))
+    return fresh, stale
 
 
 def scan(

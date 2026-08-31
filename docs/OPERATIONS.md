@@ -239,3 +239,24 @@ collapse into a single pair, and the broker's `avg_entry_price` averages
 across both fills — observed 2026-08-26 on the doubled HD position as a 4¢
 credit drift. The monitor now prefers the journal's fill-derived credit,
 which sidesteps the averaging; the entry gates prevent the doubling itself.
+
+## Change record, 2026-08-30 (evening) — stale signal-bar guard shipped
+
+The open item from Friday ("first ~20 min of the day trade yesterday's
+close bar") went to production tonight, before the Monday open:
+
+- `max_signal_bar_age_s = 1800` in `StrategyConfig`. A signal whose bar
+  **closed** more than 30 minutes ago is dropped before the spread builder
+  runs, with a narrated `veto` event ("stale data treated as down"). Age is
+  measured from bar close, not the label — bar labels are window starts.
+- Rationale: the API answering with old data is the more expensive failure
+  than the API being down, because nothing errors. Friday's six
+  stale-bar signals were stopped only by the option-liquidity gates —
+  protection by luck. Monday's first judged scan must not depend on luck.
+- Freeze-rule justification: P&L-threatening defect (an overnight-gap
+  entry from yesterday's bar could be the first judged trade). Change is
+  minimal: one pure helper + one filter + 5 regression tests
+  (`tests/test_signal_age.py`, replaying the exact Friday scenario).
+- Shipped through the standard gate: 66/66 tests, preflight PASS, loop
+  restarted 19:01 CT with the market closed (clock guard no-op). Single
+  process tree verified.

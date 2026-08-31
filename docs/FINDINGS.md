@@ -59,13 +59,16 @@
   roots are never candidates), regression test with an `SPGI1` symbol in
   the fixture chain; then SPGI (and the same argument for BRK.B) can
   return. Details: OPERATIONS.md.
-- [ ] **First ~20 min of the day trade yesterday's close bar** — with the
+- [x] **First ~20 min of the day trade yesterday's close bar** — with the
   RTH filter plus the 15-min SIP delay, scans from 8:30 to ~8:50 CT see
   yesterday's 14:55 CT bar as "latest" and fire its signals (6 on
   2026-08-28, all vetoed by open-hour option liquidity — protection by
-  luck, not by design). Consider a max signal-bar age (e.g. ignore bars
-  older than 30 min) so overnight-gap entries can't slip through on a
-  quiet open.
+  luck, not by design). RESOLVED 2026-08-30: `max_signal_bar_age_s=1800`
+  — a signal bar that closed more than 30 min ago is treated exactly like
+  a down feed (no order, narrated veto in the event feed). Age is measured
+  from the bar's CLOSE (labels are window starts). Regression tests in
+  `tests/test_signal_age.py` replay the exact Friday scenario. Prompted by
+  a build-in-public exchange: "reachable and lying is the expensive case."
 - [ ] **Selector hardening, deferred half** — delta-vs-price plausibility
   check and short-leg minimum bid (deliberately not shipped 2026-08-26).
 - [ ] **Same-expiry spread collapse** — `reconstruct_spreads` keys legs by

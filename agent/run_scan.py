@@ -31,6 +31,22 @@ def run_scan(dry_run: bool = True) -> None:
     if not signals:
         return
 
+    # Stale tape = down tape. With the 15-min SIP delay + RTH filter, the
+    # first scans of a session see yesterday's close bar as "latest" — its
+    # signals must never trade (2026-08-28: six fired, saved only by the
+    # liquidity gates).
+    signals, stale_sigs = ml30.split_stale(signals, cfg.strategy.max_signal_bar_age_s)
+    for sig, age in stale_sigs:
+        log.info("stale-bar veto: %s bar %s closed %.0f min ago (max %d)",
+                 sig.symbol, sig.bar_time, age / 60,
+                 cfg.strategy.max_signal_bar_age_s // 60)
+        events.emit("veto", symbol=sig.symbol,
+                    reason=f"signal bar closed {age / 60:.0f} min ago "
+                           f"(max {cfg.strategy.max_signal_bar_age_s // 60}) — "
+                           "stale data treated as down")
+    if not signals:
+        return
+
     equity = broker.equity()
     obp = broker.options_buying_power()
     positions = broker.option_positions()

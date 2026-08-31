@@ -25,6 +25,14 @@ class StrategyConfig:
     # with the live signal data (events now log sma55/sma21/bar_time).
     max_signal_strength: float = 0.02
     max_new_per_sector_per_scan: int = 1   # one fresh bet per sector per scan
+    # Free-tier SIP history trails ~15 min, and with the RTH filter the first
+    # scans of a session (8:30-8:50 CT) see YESTERDAY'S closing bar as
+    # "latest" — six of its signals fired live on 2026-08-28 and only the
+    # option-liquidity gates stopped them. A signal bar that closed more than
+    # this many seconds ago is treated exactly like an unreachable feed: no
+    # order. 30 min covers the normal delay with margin and blocks any
+    # overnight replay.
+    max_signal_bar_age_s: int = 1800
     order_stale_after_s: int = 180         # cancel unfilled entries after 3 minutes
     # A stale entry older than this is cancelled WITHOUT a reprice — its
     # signal died with it. (2026-08-26: a downed monitor swept 2-hour-old

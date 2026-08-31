@@ -18,4 +18,6 @@ Post URLs: Jose collects the live links for the submission form.
 
 Ideas bench: SPGI1 adjusted-contract postmortem (setback content) · the
 event-log "why" trail on one trade end-to-end · veto funnel (signals in,
-orders out).
+orders out) · "a LinkedIn comment shipped a fix to production before the
+opening bell" — the stale-bar guard (reachable-and-lying thread, day 3
+comments → `max_signal_bar_age_s` shipped Sunday night).
