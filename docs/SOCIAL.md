@@ -7,6 +7,10 @@ LinkedIn) ride in the opening dateline of the post — e.g. "Day 4 · AI
 Trading Agents Hackathon by @Alpaca and @lablab.ai" — never as a bare
 mention block before the first sentence, which reads as a tag dump and
 burns the hook. A post that opens with prose needs no leading `.` on X.
+Hashtags close the post, never open it: 4–5 on LinkedIn, 2–3 on X. When a
+commenter's input changed the system, tag them at the point in the story
+where their idea lands — credit where it was earned reads as honest and
+pulls the original thread back into the conversation.
 
 | Day | Date | Theme | Image | Links |
 |---|---|---|---|---|
