@@ -260,3 +260,16 @@ close bar") went to production tonight, before the Monday open:
 - Shipped through the standard gate: 66/66 tests, preflight PASS, loop
   restarted 19:01 CT with the market closed (clock guard no-op). Single
   process tree verified.
+
+## Thursday close-out plan, decided 2026-08-31 (Jose)
+
+The judged number is total account equity as of EOD Thursday, Sep 3. The
+strategy holds spreads 7-21 days, so at any snapshot most of the book would
+be marked at closing option quotes — pessimistic marks, not realized value.
+Decision: **close all positions Thursday afternoon, before the 15:00 CT
+bell**, so the judged equity is cash. This is a sanctioned operator action
+(documented here per Rule 5's exception process), to be executed with Jose's
+confirmation in the moment: review the book ~13:30 CT, close with
+reasonable limits through the agent's exit path, verify a flat book, record
+the final equity. Our expiries are all Sep 7 or later, so the FAQ's note
+about Sep 3rd exercises/assignments does not touch us.

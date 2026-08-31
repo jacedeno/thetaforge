@@ -79,12 +79,21 @@ position, fractional-Kelly territory; aggregate worst case 22.5%).
 - **Alpaca CLI** — the agent's execution layer: every entry, reprice, exit and
   cancel runs through `alpaca order submit/cancel` with structured JSON and
   idempotent client order ids; raw REST is an automatic fallback.
-- **Trading API / alpaca-py + Market Data API** — 15-minute equity bars for
+- **Trading API / alpaca-py + Market Data API** — 5-minute equity bars for
   signals, option chains with greeks for structure selection, live option
   quotes for exit pricing and mark-vs-mid honesty.
 - **MCP server** — the AI operator's supervision channel: account, orders,
   chains and docs inspected through MCP during build and live operation.
 - **Paper trading environment** — all of it, end to end.
+
+**Why the order loop runs on the official SDK + CLI rather than through
+MCP** (per the FAQ's request to justify SDK use): MCP is a conversational
+tool interface — ideal for the supervising LLM, wrong for the money path.
+Deterministic risk gates need typed responses, explicit error handling and
+idempotent client order ids with no model in between, which is exactly what
+the official `alpaca-py` SDK and the Alpaca CLI provide. So the split
+mirrors the architecture itself: supervision through MCP, execution through
+the official SDK and CLI.
 
 Every decision lands in a structured event log and a SQLite trade journal
 (broker fills joined with the agent's *why*: signal strength in, exit reason
