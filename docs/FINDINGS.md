@@ -69,6 +69,38 @@
   from the bar's CLOSE (labels are window starts). Regression tests in
   `tests/test_signal_age.py` replay the exact Friday scenario. Prompted by
   a build-in-public exchange: "reachable and lying is the expensive case."
+- [ ] **The credit floor lets in spreads that cannot be closed** — found
+  2026-08-31, first day of the judged window. The entry gate accepts a credit
+  of $0.15 on a $1-wide spread (15% of width, over the 12% floor). The 50%
+  profit target on that credit is **$0.075**, which sits below the price at
+  which a penny-quoted spread can actually be bought back. PFE was entered at
+  0.15, reached its target, and the monitor tried to close it **47 times
+  without a single fill** — correctly refusing to overpay, but retrying every
+  pass instead of backing off. Four of the day's fifteen positions are in this
+  class (PFE, CMCSA, NFLX, VZ, all $1-wide with credits of 0.15–0.19); the
+  $5-wide spreads on expensive underlyings target $0.40–0.55 and close fine.
+  **The asymmetry is the real defect: the stop (2x credit, ~$0.30) IS
+  reachable while the profit target is not**, so a thin spread can take its
+  loss early but not its win. Fix belongs at entry, not exit: require the 50%
+  target to clear $0.15, i.e. a **minimum credit of $0.30**, which excludes all
+  four of the day's thin trades and none of the good ones. Not shipped during
+  the competition — the book is full at 15/15 so the gate barely fires again,
+  and none of the four is losing money. Retrying 47 times a day is noise, not
+  cost; a back-off after the first unfilled attempt is the cosmetic half.
+- [ ] **Equity read after the close is not the equity at the close** —
+  2026-08-31: the account showed **98,703 at the bell and 96,653 forty minutes
+  later**, with no trade in between. Option market makers pull their quotes at
+  the close and the marks widen against every position (CAT's short leg quoted
+  6.38/9.53, three dollars wide). Two consequences. First, **read equity from
+  the portfolio-history snapshot at 20:00 UTC, never from a live account call
+  after the bell** — a post-close number overstates the loss by ~2% of the
+  book. Second, mark-vs-mid: the same fifteen positions were **-3,340 at the
+  broker's marks and -905 at the midpoint**, so $2,435 of the reported loss was
+  the bid-ask of opening a full book in one session, not economics. This is the
+  write-up's honesty section showing up as a measurement problem, and it argues
+  for **holding the book through Thursday rather than closing it** — closing
+  pays the exit spread on fifteen positions to convert marks that the bell
+  snapshot already reports fairly.
 - [ ] **Selector hardening, deferred half** — delta-vs-price plausibility
   check and short-leg minimum bid (deliberately not shipped 2026-08-26).
 - [ ] **Same-expiry spread collapse** — `reconstruct_spreads` keys legs by

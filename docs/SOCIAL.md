@@ -18,7 +18,7 @@ pulls the original thread back into the conversation.
 | 2 | Sat Aug 29 | Compliance by construction — 23h uptime, zero trades, clock guard holds until Monday | `assets/day2-waiting.png` | X + LinkedIn (posted) |
 | 3 | Sun Aug 30 | Bare metal + architecture diagram — no cloud, one Debian box, LLM outside the order loop | `assets/architecture.png` | X + LinkedIn (posted) |
 | 4a | Mon Aug 31 (open) | Five refusals on the first scan of the judged window — the stale-bar guard, shipped Sunday night off a comment, firing live | `assets/day4-stale-vetoes.png` | — |
-| 4b | Mon Aug 31 (close) | (planned) Day recap — first judged entries, or the veto funnel if the agent stayed flat | chart of the first entry / veto funnel | — |
+| 4b | Mon Aug 31 (close) | (planned) Flat market, red book — the difference between a loss and a quote. SPY -0.04% and the marks read -3,340 while the midpoints read -905; the gap is the bid-ask of opening fifteen positions in one session | mark-vs-mid table / veto funnel | — |
 | 5 | Wed/Thu | (planned) Results + what a 4-day window can and cannot judge (write-up thesis) | equity curve / closing audit | — |
 
 Post URLs: Jose collects the live links for the submission form.
