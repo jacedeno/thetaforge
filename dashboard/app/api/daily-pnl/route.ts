@@ -6,6 +6,15 @@ export const dynamic = "force-dynamic";
 interface History { timestamp: number[]; profit_loss: (number | null)[] }
 interface Account { equity: string; last_equity: string }
 
+// Which session a moment belongs to, as a YYYY-MM-DD key in New York.
+// Alpaca stamps each daily bucket at midnight UTC of the day AFTER the
+// session it summarises: Monday 2026-08-31 arrives as 2026-09-01T00:00:00Z,
+// which is 20:00 ET on the 31st. Reading that stamp in UTC dates every bar
+// one day forward, and the most recent session — always the interesting one —
+// collides with today's key and gets filtered out entirely.
+const NY_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" });
+const sessionKey = (d: Date) => NY_DATE.format(d);
+
 /**
  * Daily P&L bars: past sessions from portfolio history (close-to-close,
  * realized + floating), today computed live from equity vs yesterday's
@@ -17,10 +26,10 @@ export async function GET() {
     alpaca("/v2/account") as Promise<Account>,
   ]);
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = sessionKey(new Date());
   const days = history.timestamp
     .map((t, i) => ({
-      date: new Date(t * 1000).toISOString().slice(0, 10),
+      date: sessionKey(new Date(t * 1000)),
       pl: history.profit_loss[i] ?? 0,
       live: false,
     }))
