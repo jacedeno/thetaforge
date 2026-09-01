@@ -51,6 +51,12 @@ class StrategyConfig:
     # Both exit rules must sit at least this far from the entry credit.
     min_exit_band_usd: float = 0.10
     min_exit_limit_usd: float = 0.02       # floor for the pad on the closing limit
+    # An unfilled close is re-placed one step closer to the natural price each
+    # time, reaching it on the third retry — with exit_stale_after_s at 120
+    # that is six minutes from "stop fired" to "pay what the book asks".
+    # Anchoring every retry at the midpoint means a wide-quoted spread never
+    # exits at all (CAT, 2026-09-01).
+    exit_escalation_steps: int = 3
 
 
 @dataclass(frozen=True)

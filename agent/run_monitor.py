@@ -11,6 +11,12 @@ log = logging.getLogger("thetaforge")
 # repeats every pass for as long as the spread is held.
 _flagged_unmanageable: set[str] = set()
 
+# How many times each spread's close has been placed and cancelled unfilled,
+# keyed by leg pair. Drives the escalation from midpoint toward the natural
+# price in exit_limit(); pruned below when the spread is no longer held, so a
+# position that closes and is later re-opened starts again at the good price.
+_exit_attempts: dict[tuple[str, str], int] = {}
+
 
 def run_monitor(dry_run: bool = True) -> None:
     from alpaca.data.historical.option import OptionHistoricalDataClient
@@ -177,6 +183,19 @@ def run_monitor(dry_run: bool = True) -> None:
             return None
         return (q.bid_price + q.ask_price) / 2
 
+    def natural_cost(sp) -> float | None:
+        """What closing costs RIGHT NOW: lift the short's ask, hit the long's bid."""
+        sq, lq = quotes.get(sp.short_symbol), quotes.get(sp.long_symbol)
+        if sq is None or lq is None or not sq.ask_price or not lq.bid_price:
+            return None
+        return round(sq.ask_price - lq.bid_price, 2)
+
+    # Forget spreads we no longer hold, so the counter tracks live positions only.
+    held = {(sp.short_symbol, sp.long_symbol) for sp in spreads}
+    for key in list(_exit_attempts):
+        if key not in held:
+            del _exit_attempts[key]
+
     for sp in spreads:
         if sp.short_symbol in pending or sp.long_symbol in pending:
             log.info("%s: pending order in flight — skip", sp.underlying)
@@ -197,10 +216,22 @@ def run_monitor(dry_run: bool = True) -> None:
             events.emit("exit_signal", symbol=sp.underlying, reason=decision.reason,
                         cost=decision.cost_to_close, credit=sp.entry_credit, qty=sp.qty)
         if decision.action == "CLOSE" and not dry_run:
-            limit = exit_limit(decision.cost_to_close, sp.width, cfg.strategy)
+            key = (sp.short_symbol, sp.long_symbol)
+            attempt = _exit_attempts.get(key, 0)
+            # Taking profit must stay profitable: never bid up to or past the
+            # credit collected. A stop or a time close has no such luxury —
+            # they are bounded only by the width.
+            ceiling = (sp.entry_credit - 0.01) if decision.kind == "target" else None
+            limit = exit_limit(
+                decision.cost_to_close, sp.width, cfg.strategy,
+                natural=natural_cost(sp), attempt=attempt, ceiling=ceiling,
+            )
             order = broker.close_credit_spread(
                 sp.short_symbol, sp.long_symbol, sp.qty, limit
             )
-            log.info("  close order %s status=%s limit=%.2f", order["id"], order["status"], limit)
+            _exit_attempts[key] = attempt + 1
+            log.info("  close order %s status=%s limit=%.2f (attempt %d)",
+                     order["id"], order["status"], limit, attempt)
             events.emit("order_close", symbol=sp.underlying, qty=sp.qty,
-                        limit=limit, reason=decision.reason, status=order["status"])
+                        limit=limit, reason=decision.reason, status=order["status"],
+                        attempt=attempt, natural=natural_cost(sp))

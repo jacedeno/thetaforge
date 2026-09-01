@@ -73,6 +73,10 @@ class ExitDecision:
     reason: str
     cost_to_close: float | None = None
     flag: str | None = None  # "unmanageable" | "non_positive_credit"
+    # Which rule fired: "time" | "stop" | "target". The closing limit is
+    # allowed to escalate further on a stop than on a target, so the caller
+    # needs this without parsing `reason`.
+    kind: str = ""
 
 
 def reconstruct_spreads(
@@ -151,7 +155,7 @@ def evaluate_exit(
 
     dte = (spread.expiration - today).days
     if dte <= TIME_STOP_DTE:
-        return ExitDecision("CLOSE", f"time stop ({dte} DTE)", cost)
+        return ExitDecision("CLOSE", f"time stop ({dte} DTE)", cost, kind="time")
 
     credit = spread.entry_credit
     if credit <= 0:
@@ -165,7 +169,8 @@ def evaluate_exit(
     loss = cost - credit
     stop_at = max(strategy.stop_loss_credit_mult * credit, strategy.min_exit_band_usd)
     if loss >= stop_at:
-        return ExitDecision("CLOSE", f"stop loss (loss {loss:.2f} >= {stop_at:.2f})", cost)
+        return ExitDecision(
+            "CLOSE", f"stop loss (loss {loss:.2f} >= {stop_at:.2f})", cost, kind="stop")
 
     target_cost = round(credit - max(strategy.profit_target_pct * credit, strategy.min_exit_band_usd), 2)
     if target_cost < 0:
@@ -177,20 +182,47 @@ def evaluate_exit(
             cost, flag="unmanageable",
         )
     if cost <= target_cost:
-        return ExitDecision("CLOSE", f"profit target (cost {cost:.2f} <= {target_cost:.2f})", cost)
+        return ExitDecision(
+            "CLOSE", f"profit target (cost {cost:.2f} <= {target_cost:.2f})", cost, kind="target")
 
     return ExitDecision(
         "HOLD", f"dte={dte} cost={cost:.2f} credit={credit:.2f} ({spread.credit_source})", cost
     )
 
 
-def exit_limit(cost: float, width: float, strategy: StrategyConfig) -> float:
-    """Closing limit: cross the spread a little to actually fill.
+def exit_limit(
+    cost: float,
+    width: float,
+    strategy: StrategyConfig,
+    natural: float | None = None,
+    attempt: int = 0,
+    ceiling: float | None = None,
+) -> float:
+    """Closing limit: start at the midpoint, walk toward the natural price.
 
     Floored so a near-zero cost cannot produce a sub-penny limit, never
     negative (an inverted quote pair must not flip into a debit via abs()
     downstream), and capped at the width — no rational close pays more than
     the spread is ever worth.
+
+    `attempt` is how many times this same exit has already been placed and
+    cancelled unfilled. Attempt 0 offers mid + pad, the price we WANT. Each
+    retry moves a fixed fraction of the way to `natural` (short ask − long
+    bid), reaching it at `exit_escalation_steps`.
+
+    Without this the limit was mid + 2% on every retry, forever. On a spread
+    whose legs quote two dollars wide that is not a price, it is a wish:
+    2026-09-01, CAT's stop fired and re-placed the same unfillable 3.35
+    against a natural of 5.71 eight times in seventeen minutes while the
+    position ran from -2.17 to -2.98. The entry path learned this on
+    2026-08-26 and repriced to natural; the exit path never did.
+
+    `ceiling` bounds the walk below `width` — a profit-target close must stay
+    under the entry credit, or "taking profit" books a loss.
     """
     pad = max(strategy.min_exit_limit_usd, round(0.02 * max(cost, 0.0), 2))
-    return round(min(max(cost, 0.0) + pad, width), 2)
+    limit = max(cost, 0.0) + pad
+    if natural is not None and natural > limit:
+        steps = max(1, strategy.exit_escalation_steps)
+        limit += min(1.0, attempt / steps) * (natural - limit)
+    return round(min(limit, width if ceiling is None else min(width, ceiling)), 2)

@@ -169,6 +169,38 @@ def test_exit_limit_never_negative():
     assert exit_limit(-0.30, 5.0, CFG) == 0.02
 
 
+def test_exit_limit_walks_to_natural_across_retries():
+    """CAT, 2026-09-01: mid 3.30, natural 4.65, stop fired, eight no-fills.
+
+    The first attempt still offers the price we want. Each retry closes a
+    third of the distance, so the fourth pays what the book is asking.
+    """
+    first = exit_limit(3.30, 10.0, CFG, natural=4.65, attempt=0)
+    assert first == 3.37                       # mid + 2%, unchanged behaviour
+    walk = [exit_limit(3.30, 10.0, CFG, natural=4.65, attempt=n) for n in range(5)]
+    assert walk == sorted(walk), "the limit must never step backwards"
+    assert walk[3] == 4.65 and walk[4] == 4.65, "capped at natural, never above"
+
+
+def test_exit_limit_ignores_natural_below_midpoint():
+    """A natural under mid + pad is a crossed or stale book — offer our price."""
+    assert exit_limit(3.30, 10.0, CFG, natural=2.00, attempt=3) == 3.37
+
+
+def test_exit_limit_profit_target_never_books_a_loss():
+    """Escalating a target close must stay under the credit collected.
+
+    PFE-shaped: 0.15 credit, cost 0.04, but a natural of 0.30 — paying it
+    would turn a 'profit target' into a nine-cent loss.
+    """
+    assert exit_limit(0.04, 1.0, CFG, natural=0.30, attempt=3, ceiling=0.14) == 0.14
+
+
+def test_exit_limit_still_capped_at_width():
+    """Width beats natural: a stop never pays more than the spread can be worth."""
+    assert exit_limit(4.90, 5.0, CFG, natural=9.00, attempt=3) == 5.0
+
+
 def test_run_monitor_names_resolve():
     """The monitor's module-level and function-level names must all import.
 
