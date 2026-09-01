@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 from types import SimpleNamespace
 
@@ -11,6 +12,9 @@ from agent.execution.monitor import (
 )
 
 CFG = StrategyConfig()
+# The stop is switched off in the shipped config for the judged window, so
+# the rule itself has to be exercised against a config that has it on.
+CFG_STOP = replace(CFG, stop_loss_enabled=True)
 TODAY = date(2026, 8, 24)
 
 
@@ -48,9 +52,27 @@ def test_profit_target():
 
 def test_stop_loss():
     # cost 3.10, loss 2.10 >= 2x credit
-    d = evaluate_exit(make_spread(), short_mid=3.60, long_mid=0.50, strategy=CFG, today=TODAY)
+    d = evaluate_exit(make_spread(), short_mid=3.60, long_mid=0.50,
+                      strategy=CFG_STOP, today=TODAY)
     assert d.action == "CLOSE"
     assert "stop loss" in d.reason
+
+
+def test_stop_loss_disabled_holds_instead_of_closing():
+    """Same trade, stop off: HOLD, flagged, and it names the bounded downside."""
+    d = evaluate_exit(make_spread(), short_mid=3.60, long_mid=0.50,
+                      strategy=CFG, today=TODAY)
+    assert d.action == "HOLD"
+    assert d.flag == "stop_disabled"
+    assert "max 4.00" in d.reason      # width 5.00 - credit 1.00
+
+
+def test_disabled_stop_never_blocks_the_time_stop():
+    """A losing position at <= 2 DTE still closes — expiration is not optional."""
+    d = evaluate_exit(make_spread(exp=date(2026, 8, 25)), short_mid=3.60, long_mid=0.50,
+                      strategy=CFG, today=TODAY)
+    assert d.action == "CLOSE"
+    assert "time stop" in d.reason
 
 
 def test_time_stop_beats_profit_target():
@@ -105,7 +127,7 @@ def test_exit_band_floor_widens_stop():
                       strategy=CFG, today=TODAY)   # cost 0.12, loss 0.08
     assert d.action == "HOLD"
     d = evaluate_exit(make_spread(credit=0.04), short_mid=0.45, long_mid=0.30,
-                      strategy=CFG, today=TODAY)   # cost 0.15, loss 0.11 >= 0.10
+                      strategy=CFG_STOP, today=TODAY)   # cost 0.15, loss 0.11 >= 0.10
     assert d.action == "CLOSE"
     assert "stop loss" in d.reason
 

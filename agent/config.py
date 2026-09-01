@@ -46,6 +46,23 @@ class StrategyConfig:
     entry_concession_min: float = 0.01
     profit_target_pct: float = 0.50        # close at 50% of collected credit
     stop_loss_credit_mult: float = 2.0     # stop when loss reaches 2x credit
+    # OFF for the judged window (2026-09-01 .. 09-03), Jose's call.
+    #
+    # The stop protects capital over months, by cutting a loser before it
+    # reaches max loss. Over a three-day horizon it buys almost nothing and
+    # costs something real: risk here is already defined and collateralized
+    # (max loss = width - credit, -19,742 across the whole book), nothing
+    # expires before 2026-09-18, and a loser that is 2x credit down sits in
+    # the widest-quoted part of the chain, so stopping out pays the bid-ask
+    # at the worst moment AND destroys the recovery the remaining 17 days
+    # might deliver. The score reads total equity, which already carries the
+    # open loss either way: closing CAT at natural moves equity by +12 on a
+    # -375 position.
+    #
+    # Profit targets and the time stop stay ON. Winners close, losers ride.
+    # RESTORE TO True after the window closes — over a full quarter an
+    # unstopped loser is exactly how a premium-selling book dies.
+    stop_loss_enabled: bool = False
     # Credit-relative thresholds collapse on tiny credits: at 0.03 the whole
     # decision band is eight cents wide and quote flicker exits the trade.
     # Both exit rules must sit at least this far from the entry credit.

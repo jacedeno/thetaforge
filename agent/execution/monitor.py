@@ -169,6 +169,16 @@ def evaluate_exit(
     loss = cost - credit
     stop_at = max(strategy.stop_loss_credit_mult * credit, strategy.min_exit_band_usd)
     if loss >= stop_at:
+        if not strategy.stop_loss_enabled:
+            # Held deliberately: risk is capped at width - credit and posted as
+            # collateral, so the downside is already known and already priced
+            # into equity. See config for why this is off during the window.
+            return ExitDecision(
+                "HOLD",
+                f"stop loss disabled — holding (loss {loss:.2f} >= {stop_at:.2f}, "
+                f"max {(spread.width - credit):.2f})",
+                cost, flag="stop_disabled",
+            )
         return ExitDecision(
             "CLOSE", f"stop loss (loss {loss:.2f} >= {stop_at:.2f})", cost, kind="stop")
 

@@ -208,8 +208,10 @@ def run_monitor(dry_run: bool = True) -> None:
         log.info("%s x%d: %s — %s", sp.underlying, sp.qty, decision.action, decision.reason)
         if decision.flag and sp.underlying not in _flagged_unmanageable:
             _flagged_unmanageable.add(sp.underlying)
-            event = ("quote_anomaly" if decision.flag == "bad_quotes"
-                     else "position_unmanageable")
+            event = {
+                "bad_quotes": "quote_anomaly",
+                "stop_disabled": "stop_held",
+            }.get(decision.flag, "position_unmanageable")
             events.emit(event, symbol=sp.underlying,
                         credit=sp.entry_credit, reason=decision.reason)
         if decision.action == "CLOSE":
