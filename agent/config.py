@@ -17,7 +17,17 @@ class StrategyConfig:
     spread_width_max_usd: float = 10.0     # cap for expensive ones
     min_dte: int = 7                       # minimum days to expiration at entry
     max_dte: int = 21                      # maximum days to expiration at entry
-    max_new_positions_per_scan: int = 3    # calmest valid signals first
+    # 0 for the last judged session (2026-09-03), Jose's call: entries are OFF.
+    #
+    # The judged number is equity at EOD Thursday and the book is already at
+    # its 15-position cap. The only way a new entry appears tomorrow is by
+    # refilling a slot the moment a profit target frees it — exactly how
+    # today's NVDA close became a TSLA open minutes later. A position opened
+    # hours before the score is read has no time to collect its theta; it can
+    # only add fresh delta risk to a number we want frozen. Exits stay fully
+    # live: targets can only realize gains, and the monitor never opens.
+    # RESTORE TO 3 after the window closes, together with the stop loss below.
+    max_new_positions_per_scan: int = 0    # calmest valid signals first
     # Skip overextended breakouts — they mean-revert. Raised 0.012 -> 0.02 on
     # 2026-08-27 for the 5m burn-in: on 5-minute bars the median trigger
     # strength is ~0.003 and the ceiling mostly vetoes opening-gap crosses,
