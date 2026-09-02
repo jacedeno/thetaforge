@@ -47,9 +47,14 @@ fi
 # 2. Wait for the network. preflight ends in a live broker call, and at
 #    @reboot time DNS is routinely not up yet — without this the gate fails
 #    for a reason that has nothing to do with the code.
+#    Deliberately NO --fail and no credentials: this asks "can I reach the
+#    broker", not "am I authorised". The endpoint answers 401 to an unsigned
+#    request, which --fail would treat as a failure and spin here until the
+#    timeout, never starting the agent. curl still exits non-zero on the
+#    cases that actually matter at boot — DNS not up, no route, timeout.
 log "waiting for broker connectivity..."
 deadline=$(( $(date +%s) + NET_WAIT_S ))
-until curl -sf -m 5 -o /dev/null "$BROKER_URL"; do
+until curl -s -m 5 -o /dev/null "$BROKER_URL"; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
         log "FATAL: no broker connectivity after ${NET_WAIT_S}s — agent NOT started"
         exit 1
