@@ -12,10 +12,20 @@
 #   - starting outside market hours is a no-op inside the loop, which sleeps
 #     on its own clock guard until the open.
 #
-# Exits non-zero when the AGENT could not be brought up, so a caller can
-# alert on it. A dashboard failure is reported but never fatal — the trading
-# loop matters, a web page does not.
+# Exit codes, so a caller can tell the three outcomes apart without parsing
+# log lines (a caller that greps for a phrase reports whatever the phrase
+# happens to say, and announces a restart that never happened):
+#   0   the agent was started
+#   10  nothing to do — it was already up
+#   1   it should have started and did not; alert on this
+#
+# A dashboard failure is reported but never fatal — the trading loop matters,
+# a web page does not.
 set -uo pipefail
+
+EXIT_STARTED=0
+EXIT_NOOP=10
+EXIT_FAILED=1
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
@@ -35,13 +45,13 @@ mkdir -p "$REPO/data"
 exec 9>"$REPO/data/.boot.lock"
 if ! flock -n 9; then
     log "another boot_start already holds the lock — exiting"
-    exit 0
+    exit "$EXIT_NOOP"
 fi
 
 # 1. Never a second tree. Two loops on one account would double every order.
 if pgrep -f "agent\.main --loop" >/dev/null; then
     log "agent already running (pid $(pgrep -f 'agent\.main --loop' | tr '\n' ' ')) — nothing to do"
-    exit 0
+    exit "$EXIT_NOOP"
 fi
 
 # 2. Wait for the network. preflight ends in a live broker call, and at
@@ -57,7 +67,7 @@ deadline=$(( $(date +%s) + NET_WAIT_S ))
 until curl -s -m 5 -o /dev/null "$BROKER_URL"; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
         log "FATAL: no broker connectivity after ${NET_WAIT_S}s — agent NOT started"
-        exit 1
+        exit "$EXIT_FAILED"
     fi
     sleep 5
 done
@@ -67,7 +77,11 @@ log "broker reachable"
 #    itself on preflight, so there is deliberately no second gate here.
 before=0
 [ -f "$HEARTBEAT" ] && before=$(stat -c %Y "$HEARTBEAT")
-setsid nohup ./scripts/run_loop.sh >/dev/null 2>&1 </dev/null &
+# 9>&- keeps the lock out of the child. Without it the agent inherits the
+# open descriptor and holds the lock for its entire life, so every later run
+# stops at the lock instead of reaching the "already running" check above —
+# reporting a stale-lock collision where there is simply a healthy agent.
+setsid nohup ./scripts/run_loop.sh >/dev/null 2>&1 </dev/null 9>&- &
 
 # 4. Verify it actually came up. The loop writes the heartbeat at the top of
 #    its first iteration — i.e. only AFTER preflight passed. A refreshed
@@ -79,7 +93,7 @@ until [ -f "$HEARTBEAT" ] && [ "$(stat -c %Y "$HEARTBEAT")" -gt "$before" ]; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
         log "FATAL: no heartbeat after ${START_WAIT_S}s — preflight likely failed."
         log "       check the newest logs/agent-*.log for PREFLIGHT FAILED"
-        exit 1
+        exit "$EXIT_FAILED"
     fi
     sleep 5
 done
@@ -87,10 +101,16 @@ log "agent up — $(cat "$HEARTBEAT")"
 
 # 5. Dashboard. deploy_dashboard.sh kills by port before starting, which is a
 #    no-op when nothing is listening, so it doubles as the boot path.
-if ./scripts/deploy_dashboard.sh >/dev/null 2>&1; then
+#    9>&- for the same reason as the agent: the server it leaves running would
+#    otherwise hold the lock for its entire life, and a long-lived web server
+#    is the least obvious thing to go looking for when the next boot reports
+#    that another boot_start is already running.
+if ./scripts/deploy_dashboard.sh >/dev/null 2>&1 9>&-; then
     log "dashboard up on :3777"
 else
     log "WARNING: dashboard did not come up (agent is unaffected)"
 fi
 
 log "done"
+
+exit "$EXIT_STARTED"
