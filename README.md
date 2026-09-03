@@ -4,6 +4,10 @@
 
 Built for the [Alpaca AI Trading Agents Hackathon](https://lablab.ai/ai-hackathons/alpaca-ai-trading-agents-hackathon) (Aug 28 – Sep 4, 2026).
 
+> **Status (Sep 2026):** the hackathon window is closed — four judged sessions,
+> final equity −1.9%, every trade placed and managed by the agent. The system
+> now runs in caretaker mode over its open book while its next role is decided.
+
 ## The idea
 
 Most options bots pick a structure first and hope for direction. ThetaForge does the opposite: a machine-learning momentum model (SMA55/21 crossover system, validated over years of equity backtests on the most liquid S&P 500 names) decides **where** and **which way** — and the agent expresses that view through **premium-selling structures with defined risk**:

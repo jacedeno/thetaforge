@@ -273,3 +273,30 @@ confirmation in the moment: review the book ~13:30 CT, close with
 reasonable limits through the agent's exit path, verify a flat book, record
 the final equity. Our expiries are all Sep 7 or later, so the FAQ's note
 about Sep 3rd exercises/assignments does not touch us.
+
+## Window close-out, 2026-09-03 (recorded 18:30 CT)
+
+**Final judged equity: $98,085.40 (−1.91%)** as of EOD Thursday, Sep 3.
+By session: Mon −1,309 · Tue −1,316 · Wed −1,025 · Thu **+1,736**.
+
+The Aug 31 plan above (flatten before Thursday's bell) was superseded by
+the 2026-09-01 hold decision: stop loss off inside the window, targets and
+time stop on, losers ride. That call earned its keep on the last day — the
+Thursday rebound recovered +1,736 against a book that a Wednesday flatten
+would have crystallized near the lows. Entries were frozen for the final
+session (2026-09-02, `max_new_positions_per_scan = 0`): with the book at
+its 15-position cap, the only possible entry was refilling a slot freed by
+a profit target, all delta and no theta at that horizon.
+
+**ThetaForge is not the final hackathon submission** — a sibling system
+finished the window better positioned and takes the slot. This repo stands
+as what it is: four judged sessions of a premium-selling book run entirely
+by the agent, including a same-day recovery from a host reboot (boot hook
+added and tested that afternoon).
+
+**Post-window status: caretaker mode.** The agent keeps running to manage
+the open book — 15 spreads, expiries Sep 11 and Sep 18 — with entries still
+at zero, profit targets and the time stop live, and the stop loss still
+OFF. Both RESTORE notes in `agent/config.py` now gate the system's next
+role, whatever that turns out to be: no new deployment starts without
+entries back at 3 and the stop loss back on.
