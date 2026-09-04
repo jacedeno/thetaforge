@@ -16,7 +16,14 @@ class StrategyConfig:
     spread_width_min_usd: float = 1.0      # floor for cheap underlyings
     spread_width_max_usd: float = 10.0     # cap for expensive ones
     min_dte: int = 7                       # minimum days to expiration at entry
-    max_dte: int = 21                      # maximum days to expiration at entry
+    # 21 -> 14, reviewed 2026-09-04 (Jose's call). Every target in the record
+    # hit in 1-2 days regardless of entry DTE — 8 or 18, same one-day win —
+    # so the extra week of a long entry never paid a winner, while a loser
+    # at 18 DTE holds its slot for two weeks on the way to the stop or the
+    # time stop. With six slots, slot-days are the scarce resource. The cost
+    # is somewhat less credit per entry; the sample is the thinnest of the
+    # three reviews, so revisit with live data from the relaunch.
+    max_dte: int = 14                      # maximum days to expiration at entry
     # 0 for the last judged session (2026-09-03), Jose's call: entries are OFF.
     #
     # The judged number is equity at EOD Thursday and the book is already at
