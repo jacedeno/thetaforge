@@ -70,8 +70,14 @@ def run_monitor(dry_run: bool = True) -> None:
     positions = broker.option_positions()
     spreads = reconstruct_spreads(positions, credits)
     log.info("monitor: %d option leg(s) -> %d spread(s)", len(positions), len(spreads))
-    if not spreads:
-        return
+    # NO early return on an empty book here: the stale sweep below must run
+    # regardless. Returning before it meant resting entry orders were never
+    # swept while the book was empty — which is a fresh account's FIRST state.
+    # Seen live on relaunch day (2026-09-04): two unfilled entries sat 22
+    # minutes holding $840 of a $3,000 account's buying power, later orders
+    # stacked behind them, and the broker bounced the excess with a 403.
+    # Everything unstuck only when a fill made the book non-empty. The $100k
+    # account never showed this because its book was never empty.
 
     # A stale entry gets one second chance at the NATURAL price before dying.
     # The paper simulator has no market makers: a limit fills only when it
@@ -169,6 +175,9 @@ def run_monitor(dry_run: bool = True) -> None:
             pending.add(leg.symbol)
         if getattr(o, "symbol", None):
             pending.add(o.symbol)
+
+    if not spreads:
+        return
 
     symbols = [s for sp in spreads for s in (sp.short_symbol, sp.long_symbol)]
     quotes = option_data.get_option_latest_quote(
