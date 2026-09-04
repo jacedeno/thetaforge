@@ -35,12 +35,16 @@ class StrategyConfig:
     # live: targets can only realize gains, and the monitor never opens.
     # RESTORE TO 3 after the window closes, together with the stop loss below.
     max_new_positions_per_scan: int = 0    # calmest valid signals first
-    # Skip overextended breakouts — they mean-revert. Raised 0.012 -> 0.02 on
-    # 2026-08-27 for the 5m burn-in: on 5-minute bars the median trigger
-    # strength is ~0.003 and the ceiling mostly vetoes opening-gap crosses,
-    # so one notch looser still blocks the violent gaps. UNDER REVIEW — decide
-    # with the live signal data (events now log sma55/sma21/bar_time).
-    max_signal_strength: float = 0.02
+    # Skip overextended breakouts — they mean-revert. Back to 0.012, reviewed
+    # 2026-09-04 (Jose's call) against all 1,282 logged signals: median
+    # strength is 0.0027, so the burn-in's 0.02 ceiling vetoed 1% of signals
+    # — decoration, by the same test that retired the loose stop multiples.
+    # 0.012 vetoes the hottest 5%, exactly the band where the four hottest
+    # entries ever taken went one-for-four with the worst per-trade loss.
+    # The stale-bar guard below now kills the opening-gap replay that
+    # motivated loosening to 0.02 in the first place. Hot-band sample is
+    # n=4 — revisit when the live record has real counts.
+    max_signal_strength: float = 0.012
     max_new_per_sector_per_scan: int = 1   # one fresh bet per sector per scan
     # Free-tier SIP history trails ~15 min, and with the RTH filter the first
     # scans of a session (8:30-8:50 CT) see YESTERDAY'S closing bar as
