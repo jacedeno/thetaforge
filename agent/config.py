@@ -24,17 +24,11 @@ class StrategyConfig:
     # is somewhat less credit per entry; the sample is the thinnest of the
     # three reviews, so revisit with live data from the relaunch.
     max_dte: int = 14                      # maximum days to expiration at entry
-    # 0 for the last judged session (2026-09-03), Jose's call: entries are OFF.
-    #
-    # The judged number is equity at EOD Thursday and the book is already at
-    # its 15-position cap. The only way a new entry appears tomorrow is by
-    # refilling a slot the moment a profit target frees it — exactly how
-    # today's NVDA close became a TSLA open minutes later. A position opened
-    # hours before the score is read has no time to collect its theta; it can
-    # only add fresh delta risk to a number we want frozen. Exits stay fully
-    # live: targets can only realize gains, and the monitor never opens.
-    # RESTORE TO 3 after the window closes, together with the stop loss below.
-    max_new_positions_per_scan: int = 0    # calmest valid signals first
+    # Back to 3 for the relaunch (2026-09-04, Jose's call) — the freeze at 0
+    # was a window tactic for the judged sprint and died with it. The ladder
+    # caps the book at min(10, equity//500) concurrently; this only paces
+    # how fast the calmest signals may fill it within one five-minute bar.
+    max_new_positions_per_scan: int = 3    # calmest valid signals first
     # Skip overextended breakouts — they mean-revert. Back to 0.012, reviewed
     # 2026-09-04 (Jose's call) against all 1,282 logged signals: median
     # strength is 0.0027, so the burn-in's 0.02 ceiling vetoed 1% of signals
