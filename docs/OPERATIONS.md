@@ -300,3 +300,25 @@ at zero, profit targets and the time stop live, and the stop loss still
 OFF. Both RESTORE notes in `agent/config.py` now gate the system's next
 role, whatever that turns out to be: no new deployment starts without
 entries back at 3 and the stop loss back on.
+
+## Operator liquidation, 2026-09-04 08:45–08:53 CT (sanctioned — the relaunch)
+
+The post-hackathon caretaker book was flattened for the relaunch on a
+smaller account: 14 spreads closed through `scripts/close_book.py` (the
+scripted form of the 2026-08-27 reset — natural-price limits capped at the
+width, `order_close` events with reason `operator_relaunch`, loop stopped
+first). Equity $97,557.32 marked → **$97,528.47 all cash**: the entire
+liquidation cost ~$29 against the marks, and MU closed below its entry
+credit — in profit.
+
+Two operational notes, both now folded into the script:
+- An unfilled close must be cancelled and re-priced at the fresh natural
+  each pass, not waited on — HD's legs quoted $1.40 wide and its natural
+  outran three resting limits before a padded cross (3.76 vs width 5.00)
+  took it out.
+- 11 of 14 filled on the first natural within seconds; wide-quoted
+  deep-ITM spreads are the only ones that chase.
+
+The account is **flat and frozen as the hackathon archive**. The loop is
+STOPPED (nothing to manage, entries at zero). The reboot hook would harmlessly
+restart it against the flat account until the relaunch swaps the keys.
