@@ -15,6 +15,7 @@ CFG = StrategyConfig()
 # The stop is switched off in the shipped config for the judged window, so
 # the rule itself has to be exercised against a config that has it on.
 CFG_STOP = replace(CFG, stop_loss_enabled=True)
+CFG_NOSTOP = replace(CFG, stop_loss_enabled=False)   # the judged-window shape, kept as a feature
 TODAY = date(2026, 8, 24)
 
 
@@ -61,7 +62,7 @@ def test_stop_loss():
 def test_stop_loss_disabled_holds_instead_of_closing():
     """Same trade, stop off: HOLD, flagged, and it names the bounded downside."""
     d = evaluate_exit(make_spread(), short_mid=3.60, long_mid=0.50,
-                      strategy=CFG, today=TODAY)
+                      strategy=CFG_NOSTOP, today=TODAY)
     assert d.action == "HOLD"
     assert d.flag == "stop_disabled"
     assert "max 4.00" in d.reason      # width 5.00 - credit 1.00
@@ -70,7 +71,7 @@ def test_stop_loss_disabled_holds_instead_of_closing():
 def test_disabled_stop_never_blocks_the_time_stop():
     """A losing position at <= 2 DTE still closes — expiration is not optional."""
     d = evaluate_exit(make_spread(exp=date(2026, 8, 25)), short_mid=3.60, long_mid=0.50,
-                      strategy=CFG, today=TODAY)
+                      strategy=CFG_NOSTOP, today=TODAY)
     assert d.action == "CLOSE"
     assert "time stop" in d.reason
 

@@ -54,25 +54,22 @@ class StrategyConfig:
     exit_stale_after_s: int = 120
     entry_concession_pct: float = 0.03     # shade the entry limit below mid to actually fill
     entry_concession_min: float = 0.01
+    # Reviewed 2026-09-04 against the full trade record (Jose's call: keep).
+    # Ten targets captured 47% of credit in a median of one day — the 50%
+    # level is reached fast and rotates the slot; raising it buys waiting,
+    # lowering it gives up half the capture for speed nobody needs.
     profit_target_pct: float = 0.50        # close at 50% of collected credit
+    # Reviewed 2026-09-04 (Jose's call: back ON at 2x, where it was designed).
+    # The judged-week replay said 2x is P&L-neutral on this sample (holding
+    # vs stopping differed by $143 across 13 positions) — what it buys is
+    # the tail and the slot: max loss per position drops from the whole slot
+    # (~17% of a $3k account) to ~7%, and a dead loser frees its slot weeks
+    # before the time stop would. Anything looser than 2x is decoration:
+    # on $1-wide spreads max loss is ~4.5x credit, so a 3x stop protects
+    # the last tear after the position has already cried the rest. The
+    # window-only OFF (2026-09-01..03) served its purpose and is history.
     stop_loss_credit_mult: float = 2.0     # stop when loss reaches 2x credit
-    # OFF for the judged window (2026-09-01 .. 09-03), Jose's call.
-    #
-    # The stop protects capital over months, by cutting a loser before it
-    # reaches max loss. Over a three-day horizon it buys almost nothing and
-    # costs something real: risk here is already defined and collateralized
-    # (max loss = width - credit, -19,742 across the whole book), nothing
-    # expires before 2026-09-18, and a loser that is 2x credit down sits in
-    # the widest-quoted part of the chain, so stopping out pays the bid-ask
-    # at the worst moment AND destroys the recovery the remaining 17 days
-    # might deliver. The score reads total equity, which already carries the
-    # open loss either way: closing CAT at natural moves equity by +12 on a
-    # -375 position.
-    #
-    # Profit targets and the time stop stay ON. Winners close, losers ride.
-    # RESTORE TO True after the window closes — over a full quarter an
-    # unstopped loser is exactly how a premium-selling book dies.
-    stop_loss_enabled: bool = False
+    stop_loss_enabled: bool = True
     # Credit-relative thresholds collapse on tiny credits: at 0.03 the whole
     # decision band is eight cents wide and quote flicker exits the trade.
     # Both exit rules must sit at least this far from the entry credit.
