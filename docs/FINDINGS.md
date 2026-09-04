@@ -29,26 +29,27 @@
   is the validated signal again — and the dashboard computes its SMAs on
   the same RTH-only tape (extended candles stay drawn, shaded, outside the
   indicator).
-- [ ] **Sizing experiment 15 × 1.5%** — retuned 2026-08-27 midday from
-  10 × 2% (first to 13, then 15 at Jose's call: 22.5% aggregate, upper half
-  of the canonical band; the old cap had vetoed 14 signals that morning).
-  Measure with
-  `scripts/veto_summary.py`: veto counts by reason, especially "max open
-  positions" and risk-budget rejections, and compare results before locking
-  for competition week.
-- [ ] **`min_open_interest` 500 — is it the right floor?** Enforced for the
-  first time 2026-08-26 night (was documented but unimplemented). On
-  2026-08-27 it was the sole killer of CSCO (5 signals; only candidate's
-  legs at OI 319/277) and CAT (best credits of the day, 2.40–2.76 at
-  c/w 0.24–0.28, every leg at OI 49–116) while their QUOTES passed the
-  width gates. OI is a liquidity proxy; on $800 underlyings low OI with
-  tight quotes is normal. Review with data: lower the floor (~150–250)?
-  Or treat OI as secondary when the quote gates already pass? (DE stays
-  correctly vetoed either way — its chain quotes $2–7 wide with no bids.)
-- [ ] **`max_signal_strength` 0.02** — raised from 0.012 for the 5m burn-in
-  (on 5m the ceiling mostly vetoes opening-gap crosses). Review with the
-  live signal data (`sma55`/`sma21`/`bar_time` now logged per signal) and
-  lock the value for competition week.
+- [x] **Sizing experiment 15 × 1.5%** — SUPERSEDED 2026-09-04 by the
+  equity ladder for the relaunch account: positions = min(10, equity//$500),
+  $500 slots growing to 10% of equity from $5k. The percent-of-equity model
+  died with the move to an account that is 100% risk capital. See
+  `agent/risk/gates.py` (`max_positions`/`position_slot`) and the ladder
+  comment in `agent/config.py`.
+- [x] **`min_open_interest` 500 — is it the right floor?** RESOLVED
+  2026-09-04: lowered to 150. The deciding evidence cut one way — every
+  wide-quote exit the book ever suffered (CAT's unfillable stop, HD's
+  $1.40-wide liquidation legs) happened on OI-approved contracts, so the
+  floor never prevented what it exists to prevent; the quote-width gates
+  are the real measurement. The review also exposed that 71% of all vetoes
+  wore one undifferentiated "chain/liquidity" label — the selector now
+  emits a per-gate breakdown on every rejection, so the next review of any
+  liquidity gate starts from counts.
+- [x] **`max_signal_strength` 0.02** — RESOLVED 2026-09-04: back to 0.012.
+  Against all 1,282 logged signals (median strength 0.0027) the 0.02
+  ceiling vetoed 1% — decorative. 0.012 vetoes the hottest 5%, the band
+  where the four hottest entries ever taken went one-for-four with the
+  worst per-trade loss. The stale-bar guard has since removed the
+  opening-gap replay that motivated the loosening.
 - [ ] **Chain symbols that fail to parse must be skipped, not fatal** —
   2026-08-28 kickoff-day incident: SPGI's chain carries corporate-action
   adjusted contracts under the suffixed root `SPGI1`; `parse_strike` read

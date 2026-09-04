@@ -322,3 +322,29 @@ Two operational notes, both now folded into the script:
 The account is **flat and frozen as the hackathon archive**. The loop is
 STOPPED (nothing to manage, entries at zero). The reboot hook would harmlessly
 restart it against the flat account until the relaunch swaps the keys.
+
+## Relaunch day, 2026-09-04 — the $3,000 account
+
+The system's second life started today, and every number it trades on was
+re-decided against the recorded evidence rather than inherited from the
+hackathon's $100k shape:
+
+- **Account:** fresh paper account, $3,000, treated as 100% risk capital.
+  The sizing ladder replaces percent-of-equity sizing: one position per
+  $500 of equity up to ten, $500 slots growing to 10% of equity from $5k.
+- **Reviews closed, one table each:** profit target stays at 50% (ten
+  targets captured 47% in a median of one day); stop loss back ON at 2x
+  (P&L-neutral on the replay, but halves the per-slot tail and frees dead
+  slots); DTE capped at 14 (no winner ever needed the extra week); OI
+  floor 500 -> 150 (it never prevented a wide-quote exit; quote gates are
+  the measurement); signal-strength ceiling 0.02 -> 0.012 (0.02 vetoed 1%
+  of 1,282 logged signals — decoration).
+- **First hours found a real bug:** the monitor's early return on an empty
+  book sat above the stale-entry sweep, so unfilled entries were never
+  swept while no position existed — a fresh account's first state. Two
+  entries rested 22 minutes holding $840 of buying power; the broker
+  bounced the stacked excess with a 403. Fixed same day: order
+  housekeeping now runs unconditionally. The $100k account hid this for
+  the project's whole life because its book was never empty.
+- First session: entries at 14 DTE, all strengths calm, reprice-at-natural
+  filled what the mid could not. The veto breakdown is live in production.

@@ -6,7 +6,8 @@ Built for the [Alpaca AI Trading Agents Hackathon](https://lablab.ai/ai-hackatho
 
 > **Status (Sep 2026):** the hackathon window is closed — four judged sessions,
 > final equity −1.9%, every trade placed and managed by the agent. The system
-> now runs in caretaker mode over its open book while its next role is decided.
+> now trades a small live development account, resized by an equity ladder and
+> re-tuned parameter by parameter against its own recorded history.
 
 ## The idea
 
