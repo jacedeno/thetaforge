@@ -87,10 +87,17 @@ def run_scan(dry_run: bool = True) -> None:
         spread = build_put_credit_spread(
             option_data, sig.symbol, sig.close, cfg.strategy, cfg.risk,
             oi_lookup=broker.option_open_interest,
+            reject_out=(rejects := {}),
         )
         if spread is None:
-            log.info("  no spread passes chain/liquidity gates — skip")
-            events.emit("veto", symbol=sig.symbol, reason="no spread passes chain/liquidity gates")
+            # The breakdown names which gate did the killing — before this,
+            # every liquidity rejection wore the same label and reviewing a
+            # single gate meant archaeology (2026-09-04 OI review).
+            detail = " ".join(f"{k}:{v}" for k, v in sorted(rejects.items())) or "empty chain"
+            log.info("  no spread passes chain/liquidity gates (%s) — skip", detail)
+            events.emit("veto", symbol=sig.symbol,
+                        reason=f"no spread passes chain/liquidity gates ({detail})",
+                        rejects=rejects)
             continue
         qty = position_qty(spread, equity, cfg.risk)
         gate = check_all(spread, qty, equity, obp, len(held), held, cfg.risk)

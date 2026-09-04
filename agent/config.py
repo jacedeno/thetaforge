@@ -112,7 +112,16 @@ class RiskConfig:
     slot_mature_pct: float = 0.10      # past the cap, slot = this share of equity
     # 100% deployment is the policy; this stays only as an absolute ceiling.
     max_buying_power_usage_pct: float = 1.0
-    min_open_interest: int = 500              # per leg
+    # 500 -> 150, reviewed 2026-09-04 (Jose's call). OI is a proxy; quote
+    # width is the measurement, and the width gates below already take it
+    # both relative and absolute. At 500 the floor rejected tight-quoted,
+    # best-credit-of-the-day setups (CAT at OI 49-116, CSCO at 277-319)
+    # while every wide-quote exit this book ever suffered — CAT's unfillable
+    # stop, HD's $1.40-wide liquidation legs — happened on OI-approved
+    # contracts. 150 still buries penny dust; DE-style chains die on the
+    # quote gates regardless. Rejections now carry a per-gate breakdown, so
+    # the next review of this number gets counts instead of two anecdotes.
+    min_open_interest: int = 150              # per leg
     # A leg is tradable if its quote is tight in RELATIVE or ABSOLUTE terms.
     # Percent alone rejects cheap contracts where a few cents is a wide ratio;
     # cents alone rejects expensive ones where a normal ratio is many cents.

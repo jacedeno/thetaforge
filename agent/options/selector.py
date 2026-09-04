@@ -200,6 +200,7 @@ def build_put_credit_spread(
     risk: RiskConfig,
     today: date | None = None,
     oi_lookup=None,
+    reject_out: dict | None = None,
 ) -> SpreadCandidate | None:
     """Short strike nearest the target delta; long leg nearest the target width below it.
 
@@ -207,6 +208,11 @@ def build_put_credit_spread(
     Open interest lives in the trading API's contracts endpoint, not the
     chain snapshot, so it is verified on the best few candidates only —
     two lookups each. Unknown OI rejects; it never passes by default.
+
+    `reject_out`, when given, is filled with a reason -> count breakdown of
+    every rejection along the way. Before this existed, 71% of all vetoes
+    ever emitted collapsed into one undifferentiated "chain/liquidity"
+    bucket, and reviewing any single gate meant archaeology in the logs.
     """
     today = today or date.today()
     width = target_width(spot, strategy)
@@ -214,11 +220,14 @@ def build_put_credit_spread(
     if not chain:
         return None
 
-    candidates = [
-        t["candidate"]
-        for t in _trace_candidates(chain, underlying, width, strategy, risk)
-        if t["candidate"] is not None
-    ]
+    candidates = []
+    for t in _trace_candidates(chain, underlying, width, strategy, risk):
+        if t["candidate"] is not None:
+            candidates.append(t["candidate"])
+        elif reject_out is not None:
+            reject_out[_reject_bucket(t["reject"])] = (
+                reject_out.get(_reject_bucket(t["reject"]), 0) + 1
+            )
     candidates.sort(key=lambda c: abs(c.short_delta - strategy.target_short_delta))
     if oi_lookup is None:
         return candidates[0] if candidates else None
@@ -226,4 +235,22 @@ def build_put_credit_spread(
         ois = [oi_lookup(s) for s in (cand.short_symbol, cand.long_symbol)]
         if all(oi is not None and oi >= risk.min_open_interest for oi in ois):
             return cand
+        if reject_out is not None:
+            reject_out["open_interest"] = reject_out.get("open_interest", 0) + 1
     return None
+
+
+def _reject_bucket(reason: str | None) -> str:
+    """Collapse a trace reject string into a stable category for the veto event."""
+    r = reason or "?"
+    if "delta" in r:
+        return "delta_band"
+    if "quote not tradable" in r:
+        return "quote_width"
+    if "credit" in r:
+        return "credit"
+    if "greeks" in r:
+        return "no_greeks"
+    if "long strike" in r:
+        return "no_partner"
+    return r

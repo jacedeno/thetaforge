@@ -189,3 +189,29 @@ def test_sector_map_covers_universe():
     missing = [s for s in load_universe() if s not in sectors]
     assert not missing, f"symbols without sector: {missing}"
     assert StrategyConfig().max_new_per_sector_per_scan >= 1
+
+
+def test_reject_breakdown_names_the_killing_gate():
+    """Every liquidity rejection used to wear one label; the breakdown says
+    which gate did it — open interest here, with tradable quotes."""
+    rejects = {}
+    cand = build_put_credit_spread(
+        FakeChainClient(spy_chain()), "SPY", 766.0, S, R, today=TODAY,
+        oi_lookup=lambda s: 100, reject_out=rejects,
+    )
+    assert cand is None
+    assert rejects.get("open_interest", 0) >= 1
+
+
+def test_reject_breakdown_counts_credit_floor():
+    chain = {
+        "SPY260911P00700000": snap(-0.24, 0.35, 0.39),   # mid 0.37
+        "SPY260911P00695000": snap(-0.20, 0.31, 0.37),   # credit 0.03 -> floor
+    }
+    rejects = {}
+    cand = build_put_credit_spread(
+        FakeChainClient(chain), "SPY", 766.0, S, R, today=TODAY,
+        oi_lookup=lambda s: 1000, reject_out=rejects,
+    )
+    assert cand is None
+    assert rejects.get("credit", 0) >= 1
