@@ -90,14 +90,24 @@ class StrategyConfig:
 class RiskConfig:
     """Hard risk gates enforced before any order leaves the agent."""
 
-    # 1.5% x 15 = 22.5% aggregate worst case — upper half of the canonical
-    # 15-25% band, traded for more, smaller positions (Jose, 2026-08-27:
-    # burn-in experiment; more concurrent positions has historically helped
-    # results; veto counts measured via scripts/veto_summary.py).
-    # UNDER REVIEW with the burn-in data.
-    max_risk_per_position_pct: float = 0.015  # of account equity
-    max_open_positions: int = 15
-    max_buying_power_usage_pct: float = 0.50
+    # Sizing ladder (Jose, 2026-09-04) — the relaunch account is 100% risk
+    # capital, so the canonical 15-25%-of-equity band no longer applies.
+    # The ladder is a live function of equity, not a constant:
+    #   positions allowed = min(cap, equity // growth slot)   -> 6 at $3,000
+    #   slot size        = $500 while growing; once the cap of 10 is reached
+    #                      (at $5,000, where 10 x $500 = 10% exactly — the
+    #                      two phases meet without a step) the slot becomes
+    #                      10% of equity: $600 at $6k, $700 at $7k, and the
+    #                      nine $10-wide giants (slot ~$830, capital_curve.py)
+    #                      re-enter on their own at ~$8,300.
+    # In a drawdown the ladder steps down by itself: below $3,000 fewer new
+    # positions are allowed until equity recovers. Existing positions are
+    # never touched by sizing — only new entries are gated.
+    slot_growth_usd: float = 500.0     # slot size while the ladder grows
+    slot_cap_positions: int = 10       # ladder tops out here
+    slot_mature_pct: float = 0.10      # past the cap, slot = this share of equity
+    # 100% deployment is the policy; this stays only as an absolute ceiling.
+    max_buying_power_usage_pct: float = 1.0
     min_open_interest: int = 500              # per leg
     # A leg is tradable if its quote is tight in RELATIVE or ABSOLUTE terms.
     # Percent alone rejects cheap contracts where a few cents is a wide ratio;
