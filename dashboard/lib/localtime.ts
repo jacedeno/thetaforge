@@ -22,3 +22,12 @@ export function isExtendedHours(utcSec: number): boolean {
 
 // A faint neutral wash behind pre/after-market candles — readable on both themes.
 export const EXTENDED_HOURS_SHADE = "rgba(125, 125, 145, 0.10)";
+
+// The New York calendar date a timestamp belongs to. Sessions, not wall-clock
+// days, are the unit the equity curve is cut into: the curve collapses
+// closed-market time, so "one day" means "one session".
+const NY_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit",
+});
+
+export const sessionDate = (utcMs: number): string => NY_DATE.format(new Date(utcMs));

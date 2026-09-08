@@ -119,6 +119,8 @@ herdr --session tf-dash        # persistent session for the dashboard
 ```
 
 Logs land in `logs/agent-YYYY-MM-DD.log`; the agent's decision trail in `logs/events.jsonl`.
+Round trips and the equity curve go to `data/thetaforge.db` — the loop samples equity
+once per five-minute bar, and only while the market is open.
 
 **Public showcase:** https://thetaforge.geekendzone.net — served through a
 Cloudflare Tunnel (zero inbound ports). Read-only: API keys live server-side

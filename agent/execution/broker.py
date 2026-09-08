@@ -140,6 +140,23 @@ class Broker:
     def options_buying_power(self) -> float:
         return float(self.trading.get_account().options_buying_power)
 
+    def portfolio_history(self, period: str = "1W", timeframe: str = "5Min") -> dict:
+        """Raw portfolio-history buckets, market hours only.
+
+        Only the backfill uses this — the live curve is sampled by the loop.
+        Fine timeframes are served for roughly a week; a month at 5Min is a
+        400, so callers stay inside that window.
+        """
+        r = requests.get(
+            f"{PAPER_BASE}/v2/account/portfolio/history",
+            params={"period": period, "timeframe": timeframe,
+                    "intraday_reporting": "market_hours"},
+            headers=self._headers(), timeout=30,
+        )
+        if r.status_code >= 400:
+            raise RuntimeError(f"portfolio history [{r.status_code}]: {r.text}")
+        return r.json()
+
     def option_positions(self) -> list:
         return [p for p in self.trading.get_all_positions() if p.asset_class == "us_option"]
 

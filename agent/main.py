@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 import json
 from pathlib import Path
 
+from agent import journal
 from agent.run_scan import run_scan
 from agent.run_monitor import run_monitor
 
@@ -47,6 +48,7 @@ def run_loop(dry_run: bool) -> None:
 
     broker = Broker()
     last_scan_slot: str | None = None
+    last_equity_slot: str | None = None
     last_scan_ts: str | None = None
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
     iteration = 0
@@ -72,6 +74,18 @@ def run_loop(dry_run: bool) -> None:
                     last_scan_slot = slot
                     last_scan_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
                 run_monitor(dry_run=dry_run)
+                # Equity curve, one sample per bar. Deliberately AFTER the
+                # trading passes and in its own guard: the chart is worth a
+                # broker call every five minutes, and worth nothing at all if
+                # a failed write can end an iteration that still had exits to
+                # manage. Only while the market is open, so the curve carries
+                # no flat overnight run.
+                if slot != last_equity_slot:
+                    try:
+                        journal.record_equity(broker.equity())
+                        last_equity_slot = slot
+                    except Exception:
+                        log.warning("equity sample failed — continuing", exc_info=True)
             else:
                 log.info("market closed — sleeping 5m")
                 time.sleep(240)

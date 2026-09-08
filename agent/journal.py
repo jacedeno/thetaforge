@@ -38,7 +38,24 @@ CREATE TABLE IF NOT EXISTS trades (
     status          TEXT NOT NULL DEFAULT 'open',  -- open | closed
     source          TEXT NOT NULL DEFAULT 'agent'  -- agent | manual
 );
+
+-- Equity curve, sampled once per five-minute bar while the market is open.
+-- The broker's own portfolio history only serves five-minute buckets for
+-- about a week (a month at that resolution is a 400), so anything longer
+-- had to be drawn at daily resolution. Sampling it here keeps the fine
+-- grain for as long as the account lives.
+--
+-- The primary key is the floor of the sample's five-minute slot, so the
+-- table is idempotent: a restart inside the same slot, or a backfill run
+-- twice, rewrites one row instead of stacking duplicates.
+CREATE TABLE IF NOT EXISTS equity_samples (
+    ts      TEXT PRIMARY KEY,               -- ISO8601 UTC, floored to the slot
+    equity  REAL NOT NULL,
+    source  TEXT NOT NULL DEFAULT 'loop'    -- loop | backfill
+);
 """
+
+SLOT_S = 300  # one sample per five-minute bar
 
 
 def connect(path: Path | None = None) -> sqlite3.Connection:
@@ -46,11 +63,46 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     p.parent.mkdir(exist_ok=True)
     con = sqlite3.connect(p)
     con.row_factory = sqlite3.Row
-    con.execute(_SCHEMA)
+    con.executescript(_SCHEMA)   # more than one statement since equity_samples
     cols = {r[1] for r in con.execute("PRAGMA table_info(trades)")}
     if "source" not in cols:
         con.execute("ALTER TABLE trades ADD COLUMN source TEXT NOT NULL DEFAULT 'agent'")
     return con
+
+
+# ---- equity curve --------------------------------------------------------
+
+
+def slot_floor(when: datetime) -> datetime:
+    """Start of the five-minute slot `when` falls in, to the second."""
+    return when.replace(minute=when.minute // 5 * 5, second=0, microsecond=0)
+
+
+def record_equity(equity: float, when: datetime | None = None,
+                  source: str = "loop", con: sqlite3.Connection | None = None) -> str:
+    """Store one equity sample against its five-minute slot.
+
+    Returns the slot key written. A `loop` sample always wins over a
+    `backfill` one for the same slot: the backfill reconstructs the curve
+    from the broker's buckets, while the loop records the number the agent
+    actually sized against.
+    """
+    own = con is None
+    con = con or connect()
+    ts = slot_floor(when or datetime.now(timezone.utc)).isoformat(timespec="seconds")
+    try:
+        con.execute(
+            """INSERT INTO equity_samples (ts, equity, source) VALUES (?,?,?)
+               ON CONFLICT(ts) DO UPDATE SET
+                   equity=excluded.equity, source=excluded.source
+               WHERE excluded.source = 'loop' OR equity_samples.source != 'loop'""",
+            (ts, float(equity), source),
+        )
+        con.commit()
+    finally:
+        if own:
+            con.close()
+    return ts
 
 
 # ---- order pairing -------------------------------------------------------

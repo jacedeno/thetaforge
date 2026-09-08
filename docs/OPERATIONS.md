@@ -411,3 +411,44 @@ Shipped and restarted into the same session, nothing in flight, ~40 s down.
 - Restart only when `/v2/orders?status=open` is empty. The loop reloads open
   spreads from the journal, so positions are never orphaned, but an unfilled
   exit left resting across the gap is a position nobody is managing.
+
+## The equity curve became the agent's own record, 2026-09-08
+
+The chart was drawing the broker's portfolio history, and it was the wrong
+source for two reasons that only showed up once the account had more than
+one session behind it.
+
+**Resolution collapsed past a week.** The broker serves five-minute buckets
+for about seven days and answers a 400 for a month at that grain, so the
+week view fell to hourly and the month and all-time views to daily — three
+or four points for a session in which the agent had made eighty decisions.
+The loop now samples equity into `equity_samples` once per five-minute bar,
+so the fine grain survives for as long as the account does.
+
+**Closed-market time was drawn as if it were tradeable.** On a time axis a
+weekend is real distance, and the curve crossed it as a long flat run that
+carried no information and squeezed the sessions on either side into a
+corner. Two changes fix it, and they compound: the loop only samples while
+the market is open, so there are no overnight points to draw, and the chart
+plots against an ordinal axis, so the last bar of one session sits next to
+the first bar of the next with a dashed divider between them. Ranges are
+now cut in sessions rather than wall-clock days — "1W" means the last five
+sessions, which is what the label always meant to a reader.
+
+Details worth keeping:
+
+- **The sample is taken after the trading passes, in its own guard.** The
+  curve is worth a broker call every five minutes and worth nothing at all
+  if a failed write can end an iteration that still had exits to manage.
+- **The slot is the primary key.** A restart inside a bar rewrites one row
+  instead of stacking two points, which matters on a host where the loop is
+  restarted by hand.
+- **A loop sample outranks a backfilled one for the same slot.** The
+  backfill (`scripts/backfill_equity.py`, one week, the deepest the broker
+  serves at this grain) reconstructs the curve from buckets; the loop
+  records the number the sizing ladder actually saw. Where they disagree,
+  the agent's own reading is the honest one.
+- Adding a second statement to the journal schema turned `connect()` into a
+  `ProgrammingError` — SQLite executes one statement per call. The existing
+  journal test caught it before it ever reached the loop, which is the
+  whole argument for Rule 1's preflight gate.
