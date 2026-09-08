@@ -348,3 +348,66 @@ hackathon's $100k shape:
   the project's whole life because its book was never empty.
 - First session: entries at 14 DTE, all strengths calm, reprice-at-natural
   filled what the mid could not. The veto breakdown is live in production.
+
+## First full session on the relaunch account, 2026-09-08
+
+The relaunch's first complete trading day, and the first evidence with live
+counts behind the five reviews closed on 2026-09-04. Realized **+$31** on
+four exits (three targets +$141, one stop -$110); equity marked
+$2,959.34 -> $2,915.29 with five spreads still open. 39 scans, 80 signals,
+four entries filled: NKE, CMG, AMZN, GOOGL.
+
+**The stop came back and immediately did its job.** MCD stopped at 2x
+credit for -$110 — the first stop since it was re-enabled. Under the
+window's stop-off setting that position would have kept its slot on a
+5-slot book while the underlying kept going.
+
+**Exit escalation is not decoration.** Four exits took twelve `order_close`
+events and eight stale sweeps: BA and TSLA each reached attempt 3 before
+filling, and BA was cancelled and re-decided at a fresh cost twice on the
+way. The resting-limit failure this rule was written for did not recur.
+
+**The stale-bar guard paid for itself over a long weekend.** Tuesday's
+first scans saw Friday's closing bar as "latest" — 21 signals carrying bars
+5,374-5,381 minutes old, all vetoed. Without the guard the session would
+have opened with a fistful of entries priced off 3.7-day-old data.
+
+**The ladder stepped down on its own, mid-session.** The MCD stop pushed
+equity under $3,000, so allowed positions went 6 -> 5 while the book already
+held five. Thirteen signals were then vetoed with `max open positions
+reached` — the ladder tightening into a drawdown exactly as designed, with
+no operator action and no effect on the open positions.
+
+**The gate breakdown settles the OI argument.** Aggregated over the day's
+rejections: `delta_band` 220, `no_greeks` 216, `quote_width` 77, `credit` 9,
+`open_interest` 7. The floor lowered to 150 on 2026-09-04 is now the least
+binding gate in the set, and the chains that die still die on quote width —
+which is what that review predicted and could not yet prove.
+
+### Log files now carry the day they describe
+
+`run_loop.sh` resolved its log name once, with `date` at launch. The loop is
+started by hand rather than as a service, so one invocation routinely spans
+days: `agent-2026-09-06.log` held the 6th, 7th and 8th, while the 6th itself
+was split across two files by that morning's restart. No file held one whole
+day, and one day sat in two files — a bad position to be in when a session
+has to be reconstructed after the fact. The file is now chosen per line
+(`printf %()T`, a shell builtin, so no subprocess at four lines a minute).
+Shipped and restarted into the same session, nothing in flight, ~40 s down.
+
+### Two notes for whoever restarts this next
+
+- **The process tree is four, not three.** Moving the `tee` into a
+  `while read` loop gives that loop its own subshell, so `run_loop.sh`
+  appears twice in `ps` alongside the `uv` wrapper and python. Kill all
+  four, then verify — a half-killed tree that gets relaunched is two loops
+  on one account, which doubles every order.
+- **`boot_start.sh` guards on `pgrep -f "agent\.main --loop"`, and pgrep
+  matches command lines, including the one running the restart.** Type that
+  pattern into the same command that invokes the script and it reports
+  "already running", exits 10, and starts nothing — a restart that never
+  happened, announced as a success. Keep the pattern out of the invoking
+  command line.
+- Restart only when `/v2/orders?status=open` is empty. The loop reloads open
+  spreads from the journal, so positions are never orphaned, but an unfilled
+  exit left resting across the gap is a position nobody is managing.
