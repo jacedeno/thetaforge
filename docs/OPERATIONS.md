@@ -452,3 +452,48 @@ Details worth keeping:
   `ProgrammingError` — SQLite executes one statement per call. The existing
   journal test caught it before it ever reached the loop, which is the
   whole argument for Rule 1's preflight gate.
+
+## The agent moved hosts, 2026-09-08 (after the close)
+
+ThetaForge left the orchestration host for the trading host and became a
+systemd unit. Same account, same code, same open book — only the machine and
+the lifecycle changed.
+
+It had been the one bot on a machine whose own house rule says bots do not run
+there, and that exception had a price: a `@reboot` cron hook, a `boot_start.sh`
+wrapper with its own lock and heartbeat wait, and a restart procedure that
+meant killing four literal PIDs and hoping none survived. On the trading host
+systemd is the existing pattern, so all of that scaffolding retires at once.
+`ExecStart` is still `scripts/run_loop.sh`, which keeps the preflight gate and
+the per-day log file; what is new is a supervisor, start on boot, and a stop
+that ends the whole cgroup.
+
+**The migration's one real danger is two loops on one account** — every order
+would double. The sequence was therefore: stop the old loop, prove it dead,
+carry the state, then start the new one. Never overlapping. The `@reboot` hook
+was removed *first*, before anything else, because it is the one thing that
+could resurrect the old loop after the new one was live.
+
+What actually had to travel is not in git: `data/thetaforge.db` (the round-trip
+journal and the equity curve) and `logs/events.jsonl` (the decision trail the
+dashboard reads). Both were verified by md5 on both sides rather than trusted
+to the copy. `.venv`, `node_modules` and `.next` were rebuilt on the target,
+never copied.
+
+Verified before the old host was dismantled: preflight PASS on the target
+(84 tests plus a live smoke pass), a monitor pass listing all five open spreads
+as `(journal)`, the heartbeat advancing on its five-minute closed-market
+cadence across three samples, and the public URL answering from the new origin.
+Only then were the build artifacts on the old host deleted; its `data/` and
+`logs/` stay as a frozen snapshot, because 450 KB is the cheapest insurance in
+the project.
+
+Two things the migration turned up that were not about the migration:
+
+- The public hostname is served by a **remotely-managed** tunnel — the
+  ingress mapping lives in the provider's dashboard, not in a config file on
+  any host. Two of the three credentials on file for that provider no longer
+  authenticate; a third does. Worth knowing before an outage, not during one.
+- The tunnel maps two sibling dashboards to ports on the trading host that
+  **nothing is listening on**. Those pages have been down long enough that the
+  documentation describing them as live was simply wrong.

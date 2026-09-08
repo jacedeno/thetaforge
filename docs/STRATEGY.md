@@ -108,14 +108,28 @@ and literature comparison live in [`risk-sizing.md`](risk-sizing.md).
 - [ ] Iron condor leg: enable at launch, or ship directional-only MVP first
 - [ ] IV rank data source for the neutral branch
 
-## Runbook (competition week)
+## Runbook
+
+The agent runs as a systemd unit on the trading host (since 2026-09-08):
 
 ```
-herdr --session thetaforge     # persistent session for the agent
-./scripts/run_loop.sh          # scan each 15m bar close + monitor exits every minute
+systemctl status  thetaforge-bot        # scan each bar close + monitor exits every minute
+systemctl status  thetaforge-dashboard  # http://localhost:3777
+journalctl -u thetaforge-bot -f         # live output
+systemctl restart thetaforge-bot        # preflight gates the start; the unit stops the whole tree
+```
 
-herdr --session tf-dash        # persistent session for the dashboard
-./scripts/run_dashboard.sh     # http://localhost:3777
+`ExecStart` is still `scripts/run_loop.sh`, so a start is gated by the full
+preflight (test suite + a live smoke pass) and the log keeps its per-day file.
+What systemd adds is the part the wrapper could never provide: a supervisor,
+start on boot, and a stop that ends the whole process group instead of four
+PIDs by hand.
+
+To run it by hand anywhere else (development, a one-off pass):
+
+```
+./scripts/run_loop.sh                 # the same entry point the unit calls
+uv run python -m agent.main --monitor --dry-run   # one pass, decides nothing
 ```
 
 Logs land in `logs/agent-YYYY-MM-DD.log`; the agent's decision trail in `logs/events.jsonl`.
