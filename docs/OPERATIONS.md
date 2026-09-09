@@ -497,3 +497,38 @@ Two things the migration turned up that were not about the migration:
 - The tunnel maps two sibling dashboards to ports on the trading host that
   **nothing is listening on**. Those pages have been down long enough that the
   documentation describing them as live was simply wrong.
+
+## The first session under the supervisor — what to check at the open
+
+The migration was verified against a closed market. Everything proven that
+evening — the unit starts, the heartbeat advances, the dashboard answers —
+is the easy half. The half that was not exercised is the one that only
+exists between 8:30 and 15:00 CT: the scan, the entries, the exits on a
+live book, and the equity sampler writing `source = 'loop'` rows.
+
+So the first session after a move is its own checklist, in this order:
+
+1. **The unit is up and has not been restarted overnight.** `ActiveState`
+   alone proves nothing — read the start timestamp and `NRestarts`. A
+   restart means the supervisor caught a crash and hid it, which is exactly
+   what a supervisor is for and exactly what must not go unnoticed.
+2. **The first scan of the session ran.** Not "the loop is alive" — the
+   scan. It is the first thing that touches the market data path on the new
+   host, and a broken feed looks identical to a quiet market until you read
+   the log line that says how many candidates were evaluated.
+3. **The stale-bar guard is vetoing, not blocking.** The free data tier
+   trails the tape, so the first scans of a session legitimately see the
+   previous close as "latest" and refuse to trade on it. Vetoes in the first
+   twenty minutes are the guard working. Vetoes at 11:00 are a dead feed.
+4. **The equity curve has fresh loop-sourced rows.** The sampler only runs
+   with the market open, so its first real proof arrives on the first
+   session, never before. Backfilled rows carry a different source for
+   exactly this reason: they cannot be mistaken for evidence the sampler
+   works.
+5. **The open book is still managed.** Positions carried across a host move
+   must appear in the monitor pass reading from the journal — that is what
+   makes them exits the agent will take, rather than orphans sitting in the
+   broker account waiting on a time stop.
+
+Only after all five does the move count as finished. Until then the correct
+posture is that the agent has been proven to start, not proven to trade.
