@@ -17,9 +17,38 @@ type Range = (typeof RANGES)[number];
 
 interface Point { t: number; equity: number }
 interface Session { date: string; start: number; count: number }
+interface Benchmark {
+  capital: number;
+  start: number;
+  series: Record<string, (number | null)[]>;
+  error?: string;
+}
+
+// The buy-and-hold lines the account is measured against, in draw order.
+// Each one can be hidden on its own; the account's curve never can.
+const BENCHMARKS = [
+  { symbol: "SPY", color: "--series-2" },
+  { symbol: "QQQ", color: "--series-3" },
+] as const;
+const STRATEGY = "ThetaForge";
+const HIDDEN_KEY = "tf-equity-hidden";
 
 const TIME = { hour: "numeric", minute: "2-digit" } as const;
 const DAY = { month: "short", day: "numeric" } as const;
+
+const usd = (v: number) => v.toLocaleString("en-US", { style: "currency", currency: "USD" });
+const pct = (v: number, base: number) => {
+  const p = (v / base - 1) * 100;
+  return `${p >= 0 ? "+" : ""}${p.toFixed(2)}%`;
+};
+
+function readHidden(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY);
+    if (raw) return new Set(JSON.parse(raw) as string[]);
+  } catch {}
+  return new Set();
+}
 
 export default function EquityChart() {
   const ref = useRef<HTMLDivElement>(null);
@@ -30,6 +59,20 @@ export default function EquityChart() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [label, setLabel] = useState("this session");
   const [source, setSource] = useState("journal");
+  const [startEquity, setStartEquity] = useState<number | null>(null);
+  const [bench, setBench] = useState<Benchmark | null>(null);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+
+  useEffect(() => { setHidden(readHidden()); }, []);
+
+  const toggle = (symbol: string) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +85,8 @@ export default function EquityChart() {
           setSessions(j.sessions ?? []);
           setLabel(j.label ?? "");
           setSource(j.source ?? "journal");
+          setStartEquity(j.startEquity ?? null);
+          setBench(j.benchmarks ?? null);
         })
         .catch(() => {});
     load();
@@ -92,6 +137,25 @@ export default function EquityChart() {
     const multi = sessions.length > 1;
     const starts = new Set(sessions.slice(1).map((s) => s.start));
 
+    // Where each line's return is measured from: the account from its first
+    // sample, each benchmark from the capital it was bought with.
+    const base: Record<string, number> = { [STRATEGY]: startEquity ?? points[0].equity };
+    const benchSeries = BENCHMARKS.flatMap(({ symbol, color }) => {
+      const values = bench?.series[symbol];
+      if (!values || hidden.has(symbol)) return [];
+      base[symbol] = bench!.capital;
+      return [{
+        name: symbol,
+        type: "line" as const,
+        data: values,
+        showSymbol: false,
+        connectNulls: false,
+        lineStyle: { color: token(color), width: 1.5, cap: "round" as const, join: "round" as const },
+        itemStyle: { color: token(color) },
+        emphasis: { disabled: true },
+      }];
+    });
+
     chart.current.setOption({
       backgroundColor: "transparent",
       grid: { left: 64, right: 16, top: 16, bottom: 28 },
@@ -101,11 +165,17 @@ export default function EquityChart() {
         backgroundColor: surface,
         borderColor: grid,
         textStyle: { color: ink2, fontSize: 12 },
-        formatter: (params: { dataIndex: number; value: number }[]) => {
-          const p = params[0];
-          const when = new Date(points[p.dataIndex].t);
-          const money = p.value.toLocaleString("en-US", { style: "currency", currency: "USD" });
-          return `${when.toLocaleString("en-US", { ...DAY, ...TIME })}<br/><b>${money}</b>`;
+        formatter: (params: { seriesName: string; dataIndex: number; value: number | null; color: string }[]) => {
+          const when = new Date(points[params[0].dataIndex].t);
+          const rows = params
+            .filter((p) => p.value != null)
+            .map((p) => {
+              const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:${p.color};margin-right:6px"></span>`;
+              const b = base[p.seriesName];
+              const ret = b ? ` <span style="opacity:.7">${pct(p.value!, b)}</span>` : "";
+              return `${dot}${p.seriesName} <b>${usd(p.value!)}</b>${ret}`;
+            });
+          return [when.toLocaleString("en-US", { ...DAY, ...TIME }), ...rows].join("<br/>");
         },
       },
       xAxis: {
@@ -114,6 +184,10 @@ export default function EquityChart() {
         boundaryGap: false,
         axisLine: { lineStyle: { color: grid } },
         axisTick: { show: false },
+        axisPointer: {
+          label: { formatter: ({ value }: { value: string | number }) =>
+            new Date(Number(value)).toLocaleString("en-US", { ...DAY, ...TIME }) },
+        },
         // Across sessions, label the boundaries and nothing else — a
         // time-of-day tick repeated per session reads as noise.
         axisLabel: {
@@ -137,10 +211,12 @@ export default function EquityChart() {
       },
       series: [
         {
+          name: STRATEGY,
           type: "line",
           data: points.map((p) => p.equity),
           showSymbol: false,
           lineStyle: { color: series1, width: 2, cap: "round", join: "round" },
+          itemStyle: { color: series1 },
           areaStyle: { color: series1, opacity: 0.1 },
           markLine: multi
             ? {
@@ -152,9 +228,12 @@ export default function EquityChart() {
               }
             : undefined,
         },
+        ...benchSeries,
       ],
-    });
-  }, [points, sessions, themeTick, range, hasData]);
+    }, { replaceMerge: ["series"] });
+  }, [points, sessions, themeTick, range, hasData, bench, hidden, startEquity]);
+
+  const benchAvailable = bench != null && Object.keys(bench.series).length > 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -181,6 +260,41 @@ export default function EquityChart() {
           ))}
         </div>
       </div>
+      {hasData && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" role="group"
+          aria-label="Lines on the chart">
+          <span className="flex items-center gap-1.5" style={{ color: "var(--ink-secondary)" }}>
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: "var(--series-1)" }} />
+            {STRATEGY}
+          </span>
+          {BENCHMARKS.map(({ symbol, color }) => {
+            const has = bench?.series[symbol] != null;
+            const on = has && !hidden.has(symbol);
+            return (
+              <button
+                key={symbol}
+                onClick={() => toggle(symbol)}
+                disabled={!has}
+                aria-pressed={on}
+                title={has ? `${on ? "Hide" : "Show"} ${usd(bench!.capital)} of ${symbol} bought at the first sample`
+                           : `${symbol} unavailable`}
+                className="flex items-center gap-1.5 rounded px-1.5 py-0.5 transition-opacity hover:opacity-80 disabled:cursor-default disabled:opacity-40"
+                style={{
+                  color: on ? "var(--ink-secondary)" : "var(--ink-muted)",
+                  textDecoration: has && !on ? "line-through" : "none",
+                }}
+              >
+                <span className="inline-block h-2 w-2 rounded-full"
+                  style={{ background: on ? `var(${color})` : "var(--baseline)" }} />
+                {symbol} · buy &amp; hold
+              </button>
+            );
+          })}
+          {bench?.error && !benchAvailable && (
+            <span style={{ color: "var(--ink-muted)" }}>benchmarks unavailable</span>
+          )}
+        </div>
+      )}
       {hasData ? (
         <div ref={ref} className="h-64 w-full" />
       ) : (

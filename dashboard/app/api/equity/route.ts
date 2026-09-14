@@ -3,6 +3,7 @@ import Database from "better-sqlite3";
 import path from "path";
 import { alpaca } from "@/lib/alpaca";
 import { sessionDate } from "@/lib/localtime";
+import { benchmarks, type Benchmark } from "@/lib/benchmark";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,11 @@ const RANGES: Record<string, { sessions?: number; samples?: number; label: strin
   "1M":  { sessions: 21, label: "last 21 sessions" },
   "ALL": { label: "all time" },
 };
+
+// What the buy-and-hold lines are measured against: the same capital the
+// account started with, put into each index at the first sample.
+const BENCHMARK_SYMBOLS = ["SPY", "QQQ"];
+const BENCHMARK_CAPITAL = 3000;
 
 interface Sample { ts: string; equity: number }
 export interface Point { t: number; equity: number }
@@ -115,6 +121,15 @@ export async function GET(req: NextRequest) {
     points = all.slice(keep[0].start);
   }
 
+  // Never let the benchmarks take the equity curve down with them: a data
+  // API hiccup leaves the lines off and says so, and the curve still draws.
+  let bench: Benchmark;
+  try {
+    bench = await benchmarks(BENCHMARK_SYMBOLS, BENCHMARK_CAPITAL, all[0].t, points.map((p) => p.t));
+  } catch (e) {
+    bench = { capital: BENCHMARK_CAPITAL, start: all[0].t, series: {}, error: (e as Error).message };
+  }
+
   return NextResponse.json({
     range: requested,
     requested,
@@ -123,5 +138,7 @@ export async function GET(req: NextRequest) {
     sessions: sessions(points),
     source,
     sampledSessions: bySession.length,
+    startEquity: all[0].equity,
+    benchmarks: bench,
   });
 }

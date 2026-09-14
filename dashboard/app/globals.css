@@ -14,6 +14,7 @@
   --border: rgba(255, 255, 255, 0.08);
   --series-1: #3987e5;      /* signal blue */
   --series-2: #eb6834;      /* forge ember */
+  --series-3: #9b7bdc;      /* slate violet */
   --accent: #eb6834;
   --good: #0ca30c;
   --critical: #d03b3b;
@@ -35,6 +36,7 @@
   --border: rgba(11, 11, 11, 0.1);
   --series-1: #2a78d6;
   --series-2: #eb6834;
+  --series-3: #7454c2;
   --accent: #c4501c;        /* ember darkened for light-surface contrast */
   --good: #0ca30c;
   --critical: #d03b3b;
