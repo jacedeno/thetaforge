@@ -125,6 +125,23 @@
 - [x] `ml30.fetch_bars` docstring said "15-minute bars" — fixed with the RTH
   filter change.
 
+## Deferred from the 2026-09-14 review (need more closed trades first)
+
+Full record and reasoning: `docs/review-2026-09-14-exit-geometry.md`.
+Nothing below is to be changed until the record supports it.
+
+- [ ] **Credit floor per dollar of width** — `min_credit_to_width` 0.12 →
+  0.25, `min_credit_usd` 0.15 → 0.30. Removes the six-contract 0.17-credit
+  lots (NKE, CMG, BAC) that lose their whole stop to a 2% move. Decide on
+  win rate and average P&L split by credit/width band.
+- [ ] **Stop at the open crosses in one order** — skip the three-step exit
+  escalation when a stop fires in the first fifteen minutes. NVDA paid $60
+  for the ladder on 2026-09-14. Decide on loss-at-detection vs
+  loss-at-fill per stop, with time of day.
+- [ ] **Stop at 1× credit** — only after the first item is in and measured.
+- [x] ~~No Friday entries~~ — rejected 2026-09-14: ten weekend-held
+  positions produced four Monday targets against two Monday stops.
+
 ## Post-competition
 
 - [ ] **Dashboard-side strategy variables** — delta band, credit floors,
