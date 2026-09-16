@@ -10,33 +10,31 @@ Built for the [Alpaca AI Trading Agents Hackathon](https://lablab.ai/ai-hackatho
 > and the dashboard is offline. The code stays public as a record of what was
 > built and, more usefully, of why it lost money.
 >
-> After the hackathon the agent traded a small paper account for eight sessions.
-> It closed 9 round trips on its own and was shut down holding 4 more:
+> After the hackathon the agent traded a small paper account unattended for eight
+> sessions, closing 10 round trips on its own:
 >
 > | | |
 > |---|---|
-> | Round trips closed by the agent | 9 |
-> | Win rate | 5 / 9 (56%) |
-> | Average win | +$48.80 |
-> | Average loss | **−$228.00** |
-> | Realized P&L | **−$668** |
+> | Round trips closed by the agent | 10 |
+> | Win rate | 5 / 5 (50%) |
+> | Average win / average loss | +$48.80 / −$221.60 |
+> | Realized P&L | **−$864** |
 > | Account | ~$2,800 → **$1,808.52** (**−35%**) |
 >
-> **The signal was not the problem — the exits were.** A 56% win rate is a
-> perfectly workable edge. It cannot survive losing 4.7x what it wins: with that
-> payoff the strategy needs an ~82% hit rate just to break even. The profit
-> target sat near 50% of the credit received while the stop allowed roughly 2x
-> that credit, so the arithmetic was upside-down from the first trade.
+> **The loss was priced into every entry, before any exit rule ran.** The agent
+> never sold a spread for more than 23% of its width — the range across all ten
+> trades was 9% to 23%. Each position therefore risked about **$421 to collect
+> $99**, a reward:risk near **1:4.3**, which needs an **81% win rate just to break
+> even**. It won 50%. No improvement to the exits or the signal could have closed
+> a gap that was fixed at the moment of entry.
 >
-> The damage was also concentrated in a way worth naming. Three entries taken for
-> a very low credit relative to spread width (\$0.16–\$0.23 on \$1.00–\$2.50
-> wide spreads) account for **−\$614 of the −\$668**. Collecting \$0.16 to risk
-> \$0.84 does not survive contact with any realistic sample size, and no
-> refinement of the entry signal would have rescued it.
+> Position sizing was not the culprit — max loss per position held steady at
+> $385–$504 against a ~$400 target, so the sizer was doing its job with badly
+> priced structures. The fix is a minimum credit as a percentage of spread width,
+> enforced at entry: a floor near one third of width would have rejected all ten
+> of these trades, which is the correct outcome.
 >
-> Anything built on this should start from a minimum credit as a percentage of
-> spread width and symmetric stop/target arithmetic — and should be backtested
-> before it is funded. Full post-mortem in [`docs/POSTMORTEM.md`](docs/POSTMORTEM.md).
+> Full trade table and diagnosis in [`docs/POSTMORTEM.md`](docs/POSTMORTEM.md).
 
 ## The idea
 
