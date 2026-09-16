@@ -1,7 +1,6 @@
 # ThetaForge — Build Plan & Status
 
 > Alpaca AI Trading Agents Hackathon · Aug 28 – Sep 4, 2026
-> Live: https://thetaforge.geekendzone.net
 
 ## Status — end of day Aug 24 (T-4 to kickoff)
 

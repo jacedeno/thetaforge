@@ -1,5 +1,10 @@
 # Operations — How Changes Ship and How Failures Surface
 
+> **Retired 16 September 2026.** The agent and dashboard are stopped, the
+> systemd units and the `@reboot` hook are gone, and `scripts/boot_start.sh` has
+> been deleted. This runbook is kept as a record of how the system was operated;
+> nothing in it should be executed. See [`POSTMORTEM.md`](POSTMORTEM.md).
+
 > Written 2026-08-26 after a self-inflicted incident, so Friday can't inherit it.
 
 ## The incident that wrote these rules

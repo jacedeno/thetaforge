@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ThetaForge agent loop — run inside a herdr session so it survives disconnects:
-#   herdr --session thetaforge
+# ThetaForge agent loop — run inside a persistent terminal session so it
+# survives disconnects.
 #   ./scripts/run_loop.sh            # live orders (paper account from .env)
 #   ./scripts/run_loop.sh --dry-run  # decisions only, no orders
 set -euo pipefail

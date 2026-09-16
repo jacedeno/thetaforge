@@ -1,5 +1,10 @@
 # Strategy Specification — ThetaForge
 
+> **Retired 16 September 2026.** The agent and dashboard are stopped, the
+> systemd units and the `@reboot` hook are gone, and `scripts/boot_start.sh` has
+> been deleted. This runbook is kept as a record of how the system was operated;
+> nothing in it should be executed. See [`POSTMORTEM.md`](POSTMORTEM.md).
+
 > Working spec. Parameters live in `agent/config.py`; this document explains the reasoning.
 
 ## Thesis
@@ -136,6 +141,6 @@ Logs land in `logs/agent-YYYY-MM-DD.log`; the agent's decision trail in `logs/ev
 Round trips and the equity curve go to `data/thetaforge.db` — the loop samples equity
 once per five-minute bar, and only while the market is open.
 
-**Public showcase:** https://thetaforge.geekendzone.net — served through a
-Cloudflare Tunnel (zero inbound ports). Read-only: API keys live server-side
-only; the page exposes no controls.
+**Dashboard:** the Next.js app in `dashboard/` was served read-only behind a
+tunnel while the agent ran (zero inbound ports; API keys server-side only, no
+controls exposed). It is retired along with the agent — see the README.
